@@ -115,18 +115,53 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MedicalDocumentVO uploadDocument(Long userId, String role, Long recordId, String docType, String imageUrl) {
-        if (!"ESCORT".equals(role)) throw new BizException(ResultCode.FORBIDDEN);
         // 1. 档案必须存在
         MedicalRecord r = recordMapper.selectById(recordId);
         if (r == null) throw new BizException(ResultCode.NOT_FOUND, "就医档案不存在");
-        // 2. 陪诊师必须有该老人IN_SERVICE状态的订单
-        Long count = orderMapper.selectCount(new LambdaQueryWrapper<EscortOrder>()
-                .eq(EscortOrder::getEscortId, userId)
-                .eq(EscortOrder::getElderlyId, r.getElderlyId())
-                .eq(EscortOrder::getStatus, "IN_SERVICE"));
-        if (count == 0) throw new BizException(ResultCode.FORBIDDEN, "仅可在服务中的订单关联档案上传单据");
+        if ("FAMILY".equals(role)) {
+            // 家属仅可向本人老人的档案上传
+            ElderlyProfile e = elderlyMapper.selectById(r.getElderlyId());
+            if (e == null || !e.getFamilyId().equals(userId)) throw new BizException(ResultCode.FORBIDDEN);
+        } else if ("ESCORT".equals(role)) {
+            // 陪诊师必须存在该老人的 IN_SERVICE 订单
+            Long count = orderMapper.selectCount(new LambdaQueryWrapper<EscortOrder>()
+                    .eq(EscortOrder::getEscortId, userId)
+                    .eq(EscortOrder::getElderlyId, r.getElderlyId())
+                    .eq(EscortOrder::getStatus, "IN_SERVICE"));
+            if (count == 0) throw new BizException(ResultCode.FORBIDDEN, "仅可在服务中的订单关联档案上传单据");
+        } else {
+            throw new BizException(ResultCode.FORBIDDEN);
+        }
         MedicalDocument d = new MedicalDocument();
         d.setRecordId(recordId); d.setDocType(docType); d.setImageUrl(imageUrl);
+        d.setOcrStatus("PENDING");
+        documentMapper.insert(d);
+        return toDocVO(d);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public MedicalDocumentVO createServiceRecord(Long escortId, Long orderId, String docType, String imageUrl) {
+        EscortOrder order = orderMapper.selectById(orderId);
+        if (order == null) throw new BizException(ResultCode.NOT_FOUND, "订单不存在");
+        if (!escortId.equals(order.getEscortId()))
+            throw new BizException(ResultCode.FORBIDDEN, "订单未指派给您");
+        if (!"IN_SERVICE".equals(order.getStatus()))
+            throw new BizException(ResultCode.CONFLICT, "仅可在服务中的订单下创建就医档案");
+
+        MedicalRecord r = new MedicalRecord();
+        r.setElderlyId(order.getElderlyId());
+        r.setOrderId(order.getId());
+        r.setHospitalId(order.getHospitalId());
+        r.setDepartment(order.getDepartment());
+        r.setVisitDate(order.getAppointmentTime() != null
+                ? order.getAppointmentTime().toLocalDate() : java.time.LocalDate.now());
+        recordMapper.insert(r);
+
+        MedicalDocument d = new MedicalDocument();
+        d.setRecordId(r.getId());
+        d.setDocType(docType);
+        d.setImageUrl(imageUrl);
         d.setOcrStatus("PENDING");
         documentMapper.insert(d);
         return toDocVO(d);

@@ -56,11 +56,19 @@ public class MedicalRecordController {
         return Result.ok();
     }
 
-    @Operation(summary = "上传医疗单据")
-    @PostMapping("/{id}/document") @RequireRole("ESCORT")
+    @Operation(summary = "上传医疗单据（家属上传本人档案；陪诊师仅限服务中）")
+    @PostMapping("/{id}/document") @RequireRole({"FAMILY", "ESCORT"})
     public Result<MedicalDocumentVO> uploadDoc(@PathVariable Long id,
             @RequestParam String docType, @RequestParam String imageUrl) {
         return Result.ok(recordService.uploadDocument(UserContext.getUserId(), UserContext.getUserRole(), id, docType, imageUrl));
+    }
+
+    @Operation(summary = "陪诊师在服务中订单下创建档案并上传单据")
+    @PostMapping("/escort/order/{orderId}/document") @RequireRole("ESCORT")
+    public Result<MedicalDocumentVO> createServiceRecord(@PathVariable Long orderId,
+            @RequestParam String docType, @RequestParam String imageUrl) {
+        return Result.ok(recordService.createServiceRecord(
+                UserContext.getUserId(), orderId, docType, imageUrl));
     }
 
     @Operation(summary = "单据列表（需可见性校验）")

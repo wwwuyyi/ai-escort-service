@@ -136,6 +136,29 @@ public class EscortProfileServiceImpl implements EscortProfileService {
         Map<String, Object> map = new HashMap<>();
         map.put("totalOrders", ep != null ? ep.getTotalOrders() : 0);
         map.put("avgRating", ep != null ? ep.getAvgRating() : BigDecimal.valueOf(5.00));
+
+        // 收入按结算净额（settlement.escort_income）汇总，而不是订单毛收入
+        List<com.example.escort.module.order.entity.Settlement> settlements =
+                settlementMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.example.escort.module.order.entity.Settlement>()
+                                .eq(com.example.escort.module.order.entity.Settlement::getEscortId, userId)
+                                .orderByDesc(com.example.escort.module.order.entity.Settlement::getCreateTime));
+        List<Map<String, Object>> incomeList = new ArrayList<>();
+        BigDecimal incomeTotal = BigDecimal.ZERO;
+        for (com.example.escort.module.order.entity.Settlement s : settlements) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("orderId", s.getOrderId());
+            item.put("orderNo", s.getOrderNo());
+            item.put("orderAmount", s.getOrderAmount());
+            item.put("platformFee", s.getPlatformFee());
+            item.put("escortIncome", s.getEscortIncome());
+            item.put("createTime", s.getCreateTime());
+            incomeList.add(item);
+            incomeTotal = incomeTotal.add(s.getEscortIncome());
+        }
+        map.put("incomeTotal", incomeTotal.setScale(2, RoundingMode.HALF_UP));
+        map.put("incomeList", incomeList);
+        map.put("settledCount", settlements.size());
         return map;
     }
 }

@@ -73,6 +73,8 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public EstimateVO estimate(OrderEstimateDTO dto) {
+        validateServiceType(dto.getServiceType());
+        validateDuration(dto.getDuration());
         BigDecimal unitPrice = "BASIC".equals(dto.getServiceType()) ? basePricePerHour : examPricePerHour;
         BigDecimal billed = dto.getDuration().compareTo(BigDecimal.ONE) < 0
                 ? BigDecimal.ONE : dto.getDuration().setScale(0, RoundingMode.UP);
@@ -90,6 +92,15 @@ public class OrderServiceImpl implements OrderService {
         ElderlyProfile elderly = elderlyMapper.selectById(dto.getElderlyId());
         if (elderly == null || !elderly.getFamilyId().equals(familyId))
             throw new BizException(ResultCode.BAD_REQUEST, "老人档案不存在或不属于当前账号");
+        // 业务规则校验：服务类型、时长、预约时间、医院
+        validateServiceType(dto.getServiceType());
+        validateDuration(dto.getDuration());
+        if (dto.getAppointmentTime() == null || !dto.getAppointmentTime().isAfter(LocalDateTime.now()))
+            throw new BizException(ResultCode.BAD_REQUEST, "预约时间必须晚于当前时间");
+        if (dto.getHospitalId() == null || hospitalMapper.selectById(dto.getHospitalId()) == null)
+            throw new BizException(ResultCode.BAD_REQUEST, "就诊医院不存在");
+        if (dto.getAmount() == null || dto.getAmount().signum() <= 0)
+            throw new BizException(ResultCode.BAD_REQUEST, "服务金额必须大于0");
         // 校验金额
         OrderEstimateDTO estDTO = new OrderEstimateDTO();
         estDTO.setServiceType(dto.getServiceType()); estDTO.setDuration(dto.getDuration());
@@ -314,6 +325,11 @@ public class OrderServiceImpl implements OrderService {
         s.setOrderAmount(o.getAmount()); s.setPlatformRate(platformRate);
         s.setPlatformFee(pf); s.setEscortIncome(ei); s.setSettleStatus("SETTLED"); s.setOperatorId(adminId);
         settlementMapper.insert(s);
+        // 累计完成订单数在“结算”时更新（未评价的完成订单也应计入）
+        escortProfileMapper.update(null,
+                new LambdaUpdateWrapper<EscortProfile>()
+                        .eq(EscortProfile::getUserId, o.getEscortId())
+                        .setSql("total_orders = total_orders + 1"));
         writeStatusLog(orderId, o.getOrderNo(), cur, "SETTLED", adminId, "ADMIN", "结算完成");
         notificationPublisher.publishAfterCommit(o.getEscortId(), "订单已结算",
                 "订单 " + o.getOrderNo() + " 已结算，您的收入 " + ei.setScale(2, RoundingMode.HALF_UP) + " 元。",
@@ -366,6 +382,20 @@ public class OrderServiceImpl implements OrderService {
 
     // ---- private helpers ----
 
+    private void validateServiceType(String serviceType) {
+        if (!"BASIC".equals(serviceType) && !"EXAM".equals(serviceType)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "服务类型仅支持BASIC或EXAM");
+        }
+    }
+
+    private void validateDuration(BigDecimal duration) {
+        if (duration == null
+                || duration.compareTo(BigDecimal.ONE) < 0
+                || duration.compareTo(new BigDecimal("24")) > 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "服务时长需在1-24小时之间");
+        }
+    }
+
     private EscortOrder findExistingOrder(Long familyId, String requestId) {
         return orderMapper.selectOne(new LambdaQueryWrapper<EscortOrder>()
                 .eq(EscortOrder::getRequestId, requestId)
@@ -409,8 +439,7 @@ public class OrderServiceImpl implements OrderService {
         escortProfileMapper.update(null,
                 new LambdaUpdateWrapper<EscortProfile>()
                         .eq(EscortProfile::getUserId, escortId)
-                        .set(EscortProfile::getAvgRating, avg)
-                        .setSql("total_orders = total_orders + 1"));
+                        .set(EscortProfile::getAvgRating, avg));
     }
 
     private OrderVO toVO(EscortOrder o) {
@@ -418,6 +447,10 @@ public class OrderServiceImpl implements OrderService {
         vo.setId(o.getId()); vo.setOrderNo(o.getOrderNo());
         vo.setFamilyId(o.getFamilyId()); vo.setElderlyId(o.getElderlyId());
         vo.setEscortId(o.getEscortId());
+        if (o.getFamilyId() != null) {
+            SysUser f = userMapper.selectById(o.getFamilyId());
+            if (f != null) vo.setFamilyName(f.getNickname());
+        }
         vo.setDepartment(o.getDepartment()); vo.setServiceType(o.getServiceType());
         vo.setAppointmentTime(o.getAppointmentTime()); vo.setDuration(o.getDuration());
         vo.setAmount(o.getAmount()); vo.setStatus(o.getStatus());

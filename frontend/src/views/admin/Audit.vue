@@ -60,7 +60,7 @@
     </div>
 
     <!-- Detail Dialog -->
-    <el-dialog v-model="dialogVisible" title="审核详情" width="600px" destroy-on-close>
+    <el-dialog v-model="dialogVisible" title="审核详情" width="600px" destroy-on-close v-loading="detailLoading">
       <template v-if="currentItem">
         <el-descriptions :column="1" border>
           <el-descriptions-item label="真实姓名">{{ currentItem.realName }}</el-descriptions-item>
@@ -92,7 +92,11 @@
               style="width: 120px; height: 120px; margin-right: 8px; border-radius: 4px;"
               :preview-src-list="materialUrls"
               :initial-index="idx"
-            />
+            >
+              <template #error>
+                <span class="material-error">加载失败</span>
+              </template>
+            </el-image>
             <span v-if="materialUrls.length === 0" class="no-material">未上传材料</span>
           </div>
         </div>
@@ -139,6 +143,7 @@ import { ElMessage } from 'element-plus'
 import { Checked } from '@element-plus/icons-vue'
 import api from '@/api/request'
 import { getAuditStatusClass, getAuditStatusLabel } from '@/utils/auditStatus'
+import { fileUrl } from '@/utils/fileUrl'
 
 const loading = ref(false)
 const auditing = ref(false)
@@ -149,18 +154,29 @@ const total = ref(0)
 const statusFilter = ref('')
 const dialogVisible = ref(false)
 const currentItem = ref(null)
+const detailLoading = ref(false)
 const showRejectInput = ref(false)
 const rejectRemark = ref('')
 
-const materialUrls = computed(() => {
-  if (!currentItem.value?.materials) return []
-  return currentItem.value.materials.split(',').filter(Boolean)
-})
+function parseMaterials(materials) {
+  if (!materials) return []
+  try {
+    const arr = JSON.parse(materials)
+    if (Array.isArray(arr)) return arr.filter(Boolean)
+  } catch {
+    // 非JSON时按逗号分隔兼容
+  }
+  return String(materials).split(',').map(s => s.trim()).filter(Boolean)
+}
+
+const materialUrls = computed(() =>
+  parseMaterials(currentItem.value?.materials).map(fileUrl)
+)
 
 async function fetchData() {
   loading.value = true
   try {
-    const params = { page: page.value, size: size.value }
+    const params = { current: page.value, size: size.value }
     if (statusFilter.value) params.auditStatus = statusFilter.value
     const res = await api.get('/admin/escort/audit/page', { params })
     records.value = res.data?.records || []
@@ -172,11 +188,21 @@ async function fetchData() {
   }
 }
 
-function showDetail(row) {
+async function showDetail(row) {
   currentItem.value = row
   showRejectInput.value = false
   rejectRemark.value = ''
   dialogVisible.value = true
+  // 列表返回的是 escort_profile 实体（身份证为AES密文），详情接口才返回解密明文与完整材料
+  detailLoading.value = true
+  try {
+    const res = await api.get(`/admin/escort/audit/${row.userId || row.id}/detail`)
+    if (res.data) currentItem.value = res.data
+  } catch (e) {
+    ElMessage.error('加载审核详情失败')
+  } finally {
+    detailLoading.value = false
+  }
 }
 
 async function submitApprove() {
@@ -269,6 +295,16 @@ onMounted(() => {
 .no-material {
   color: var(--muted-2);
   font-size: 14px;
+}
+.material-error {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: var(--surface-3);
+  color: var(--muted-2);
+  font-size: 12px;
 }
 .reject-section {
   margin-top: 16px;

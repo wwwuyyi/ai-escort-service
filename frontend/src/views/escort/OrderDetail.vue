@@ -91,9 +91,11 @@
           <el-form-item label="上传图片">
             <el-upload
               :action="uploadUrl"
+              :headers="uploadHeaders"
               list-type="picture-card"
               :limit="1"
               :on-success="onDocUploadSuccess"
+              :on-error="onDocUploadError"
               :before-upload="beforeDocUpload"
               v-model:file-list="docFileList"
             >
@@ -102,7 +104,7 @@
           </el-form-item>
           <el-form-item v-if="uploadedDocUrl">
             <el-button type="primary" :loading="creating" @click="handleCreateRecord">
-              创建记录并准备OCR
+              创建档案并上传单据
             </el-button>
           </el-form-item>
           <el-form-item v-if="documentId">
@@ -123,6 +125,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Plus } from '@element-plus/icons-vue'
 import api from '@/api/request'
 import { getOrderStatusLabel, getOrderStatusType, getOrderStatusClass } from '@/utils/orderStatus'
+import { authHeaders } from '@/utils/fileUrl'
 
 const route = useRoute()
 const router = useRouter()
@@ -136,7 +139,8 @@ const uploadedDocUrl = ref('')
 const documentId = ref(null)
 const creating = ref(false)
 const ocrStarting = ref(false)
-const uploadUrl = '/file/upload'
+const uploadUrl = '/api/file/upload'
+const uploadHeaders = authHeaders()
 
 function statusLabel(status) {
   return getOrderStatusLabel(status)
@@ -234,9 +238,17 @@ async function handleFinish() {
 }
 
 function onDocUploadSuccess(response) {
-  if (response?.data?.url) {
-    uploadedDocUrl.value = response.data.url
+  // 后端 FileController 返回 Result<String>，data 即 /upload/xxx 相对路径
+  if (response?.code === 200 && typeof response.data === 'string') {
+    uploadedDocUrl.value = response.data
+    ElMessage.success('图片上传成功')
+  } else {
+    ElMessage.error(response?.message || '图片上传失败')
   }
+}
+
+function onDocUploadError() {
+  ElMessage.error('图片上传失败，请确认已登录且文件格式正确')
 }
 
 function beforeDocUpload(file) {
@@ -254,15 +266,14 @@ async function handleCreateRecord() {
   }
   creating.value = true
   try {
-    const res = await api.post('/record/new', {
-      orderId: order.value.id,
-      docType: docType.value,
-      imageUrl: uploadedDocUrl.value
+    // 服务中订单：由后端按订单信息创建就医档案并挂载单据，返回 documentId
+    const res = await api.post(`/record/escort/order/${order.value.id}/document`, null, {
+      params: { docType: docType.value, imageUrl: uploadedDocUrl.value }
     })
-    documentId.value = res.data?.id || res.data
-    ElMessage.success('记录创建成功')
+    documentId.value = res.data?.id
+    ElMessage.success('档案与单据创建成功')
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '创建记录失败')
+    ElMessage.error(e?.response?.data?.message || '创建档案失败')
   } finally {
     creating.value = false
   }

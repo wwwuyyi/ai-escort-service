@@ -83,33 +83,37 @@
           </div>
 
           <div class="income-summary">
-            <span>筛选区间收入</span>
+            <span>筛选区间收入（结算净额）</span>
             <strong>¥{{ incomeTotal.toFixed(2) }}</strong>
-            <span class="income-count">共 {{ filteredOrders.length }} 笔</span>
+            <span class="income-count">共 {{ filteredSettlements.length }} 笔</span>
           </div>
 
-          <el-table :data="filteredOrders" stripe height="320">
+          <el-table :data="filteredSettlements" stripe height="320">
             <el-table-column prop="orderNo" label="订单编号" width="160" />
-            <el-table-column prop="elderlyName" label="就诊人" width="110" />
-            <el-table-column label="服务时间" width="170">
+            <el-table-column label="就诊人" width="110">
+              <template #default="{ row }">{{ orderOf(row).elderlyName || '—' }}</template>
+            </el-table-column>
+            <el-table-column label="结算时间" width="170">
               <template #default="{ row }">
-                <span class="time-text">{{ formatDateTime(row.appointmentTime) }}</span>
+                <span class="time-text">{{ formatDateTime(row.createTime) }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="department" label="科室" width="120" />
-            <el-table-column prop="amount" label="服务费" width="100">
-              <template #default="{ row }">¥{{ row.amount || '—' }}</template>
+            <el-table-column label="订单金额" width="110">
+              <template #default="{ row }">¥{{ Number(row.orderAmount || 0).toFixed(2) }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="120">
+            <el-table-column label="陪诊师收入" width="130">
               <template #default="{ row }">
-                <el-tag :class="getOrderStatusClass(row.status)">{{ getOrderStatusLabel(row.status) }}</el-tag>
+                <strong class="net-income">¥{{ Number(row.escortIncome || 0).toFixed(2) }}</strong>
               </template>
+            </el-table-column>
+            <el-table-column label="平台服务费" width="130">
+              <template #default="{ row }">¥{{ Number(row.platformFee || 0).toFixed(2) }}</template>
             </el-table-column>
             <template #empty>
               <div class="empty-block">
                 <span class="empty-icon"><el-icon :size="24"><Wallet /></el-icon></span>
                 <h4>暂无收入记录</h4>
-                <p>完成陪诊服务后，相应的服务费会展示在这里。</p>
+                <p>完成陪诊服务并结算后，对应的净收入会展示在这里。</p>
               </div>
             </template>
           </el-table>
@@ -134,7 +138,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { ArrowLeft, Finished, StarFilled, Wallet } from '@element-plus/icons-vue'
 import api from '@/api/request'
-import { getOrderStatusClass, getOrderStatusLabel } from '@/utils/orderStatus'
 
 const loading = ref(true)
 const stats = ref({})
@@ -144,15 +147,15 @@ const timeRange = ref('month')
 const customRange = ref([])
 const ratingVisible = ref(false)
 
-const completedStatuses = ['SERVICE_FINISHED', 'SETTLED', 'COMPLETED']
-
 const ratingText = computed(() => Number(stats.value.avgRating || 0).toFixed(1))
 
-const completedCount = computed(() =>
-  orders.value.filter(o => completedStatuses.includes(o.status)).length
-)
+const settlements = computed(() => stats.value.incomeList || [])
+const orderMap = computed(() => Object.fromEntries(orders.value.map(o => [o.id, o])))
+const orderOf = row => orderMap.value[row.orderId] || {}
 
-const totalCompleted = computed(() => stats.value.totalOrders || completedCount.value)
+const totalCompleted = computed(() =>
+  Math.max(Number(stats.value.totalOrders || 0), Number(stats.value.settledCount || 0))
+)
 
 const startOfWeek = () => {
   const d = new Date()
@@ -168,30 +171,31 @@ const startOfMonth = () => {
   return new Date(d.getFullYear(), d.getMonth(), 1)
 }
 
-const filteredOrders = computed(() => {
-  let list = orders.value.filter(o => completedStatuses.includes(o.status))
+const filteredSettlements = computed(() => {
+  let list = settlements.value
 
   if (timeRange.value === 'week') {
     const start = startOfWeek()
-    list = list.filter(o => new Date(o.appointmentTime) >= start)
+    list = list.filter(s => new Date(s.createTime) >= start)
   } else if (timeRange.value === 'month') {
     const start = startOfMonth()
-    list = list.filter(o => new Date(o.appointmentTime) >= start)
+    list = list.filter(s => new Date(s.createTime) >= start)
   } else if (timeRange.value === 'custom' && customRange.value?.length === 2) {
     const [s, e] = customRange.value
     const end = new Date(e)
     end.setHours(23, 59, 59, 999)
-    list = list.filter(o => {
-      const t = new Date(o.appointmentTime)
+    list = list.filter(s => {
+      const t = new Date(s.createTime)
       return t >= new Date(s) && t <= end
     })
   }
 
-  return [...list].sort((a, b) => new Date(b.appointmentTime) - new Date(a.appointmentTime))
+  return [...list].sort((a, b) => new Date(b.createTime) - new Date(a.createTime))
 })
 
+// 结算净收入（订单金额扣除平台抽成后的 escort_income），不是订单毛收入
 const incomeTotal = computed(() =>
-  filteredOrders.value.reduce((sum, o) => sum + Number(o.amount || 0), 0)
+  filteredSettlements.value.reduce((sum, s) => sum + Number(s.escortIncome || 0), 0)
 )
 
 function formatDateTime(time) {
@@ -199,16 +203,31 @@ function formatDateTime(time) {
   return String(time).replace('T', ' ').slice(0, 16)
 }
 
+async function fetchAllOrders() {
+  const size = 100
+  let current = 1
+  let all = []
+  while (current <= 20) {
+    const res = await api.get('/order/page', { params: { current, size } })
+    const records = res.data?.records || []
+    all = all.concat(records)
+    const total = Number(res.data?.total || 0)
+    if (records.length < size || all.length >= total) break
+    current++
+  }
+  return all
+}
+
 onMounted(async () => {
   try {
-    const [statsRes, profileRes, orderRes] = await Promise.all([
+    const [statsRes, profileRes, ordersResult] = await Promise.all([
       api.get('/escort/statistics'),
       api.get('/escort/profile'),
-      api.get('/order/page', { params: { page: 1, size: 100 } })
+      fetchAllOrders().catch(() => [])
     ])
     stats.value = statsRes.data || {}
     profile.value = profileRes.data || null
-    orders.value = orderRes.data?.records || []
+    orders.value = ordersResult
   } catch (e) {
     stats.value = {}
     orders.value = []
@@ -396,6 +415,11 @@ onMounted(async () => {
 .time-text {
   font-size: 12.5px;
   color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.net-income {
+  color: var(--teal-deep);
   font-variant-numeric: tabular-nums;
 }
 

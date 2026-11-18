@@ -8,8 +8,8 @@ import com.example.escort.module.admin.vo.DashboardVO;
 import com.example.escort.module.admin.vo.EscortAuditDetailVO;
 import com.example.escort.module.auth.entity.SysUser;
 import com.example.escort.module.escort.entity.EscortProfile;
-import com.example.escort.module.order.entity.EscortOrder;
 import com.example.escort.module.order.entity.Evaluation;
+import com.example.escort.module.order.vo.OrderVO;
 import com.example.escort.security.RequireRole;
 import com.example.escort.security.UserContext;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,7 +48,7 @@ public class AdminController {
         adminService.toggleUserStatus(id, status); return Result.ok(); }
 
     @Operation(summary = "全量订单管理") @GetMapping("/order/page")
-    public Result<PageResult<EscortOrder>> orderPage(@RequestParam(defaultValue = "1") int current,
+    public Result<PageResult<OrderVO>> orderPage(@RequestParam(defaultValue = "1") int current,
             @RequestParam(defaultValue = "10") int size, @RequestParam(required = false) String status,
             @RequestParam(required = false) String keyword) {
         return Result.ok(PageResult.of(adminService.orderPage(current, size, status, keyword))); }

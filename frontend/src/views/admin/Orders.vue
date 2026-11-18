@@ -48,11 +48,11 @@
       >
         <el-table-column prop="orderNo" label="订单编号" width="160" />
         <el-table-column prop="elderlyName" label="就诊人" width="100" />
-        <el-table-column label="家属ID" width="100">
-          <template #default="{ row }">{{ row.familyId || '-' }}</template>
+        <el-table-column label="家属" width="120">
+          <template #default="{ row }">{{ row.familyName || row.familyId || '-' }}</template>
         </el-table-column>
-        <el-table-column label="陪诊员ID" width="100">
-          <template #default="{ row }">{{ row.escortId || '-' }}</template>
+        <el-table-column label="陪诊员" width="120">
+          <template #default="{ row }">{{ row.escortName || row.escortId || '-' }}</template>
         </el-table-column>
         <el-table-column prop="department" label="科室" width="100" />
         <el-table-column prop="hospitalName" label="医院" min-width="140" show-overflow-tooltip />
@@ -178,7 +178,7 @@ function statusTagType(status) {
 async function fetchData() {
   loading.value = true
   try {
-    const params = { page: page.value, size: size.value }
+    const params = { current: page.value, size: size.value }
     if (statusFilter.value) params.status = statusFilter.value
     if (keyword.value) params.keyword = keyword.value
     const res = await api.get('/admin/order/page', { params })

@@ -116,9 +116,9 @@ class FullFlowIntegrationTest {
         ));
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content(body).session(s1))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
-        System.out.println("[TEST] ✅ admin×FAMILY → code=400 角色不符");
+        System.out.println("[TEST] ✅ admin×FAMILY → HTTP 400 / code=400 角色不符");
 
         MockHttpSession s2 = new MockHttpSession();
         String[] cap2 = getCaptcha(s2);
@@ -129,9 +129,9 @@ class FullFlowIntegrationTest {
         ));
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content(body).session(s2))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
-        System.out.println("[TEST] ✅ admin×ESCORT → code=400 角色不符");
+        System.out.println("[TEST] ✅ admin×ESCORT → HTTP 400 / code=400 角色不符");
     }
 
     // ==================== 测试：登录预置家属和陪诊师 ====================

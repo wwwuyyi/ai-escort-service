@@ -11,6 +11,7 @@ public class OrderVO {
     private Long id;
     private String orderNo;
     private Long familyId;
+    private String familyName;
     private String elderlyName;
     private Long elderlyId;
     private Long escortId;

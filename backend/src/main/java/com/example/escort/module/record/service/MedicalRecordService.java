@@ -13,6 +13,8 @@ public interface MedicalRecordService {
     MedicalRecordVO getById(Long userId, String role, Long id);
     void delete(Long userId, String role, Long id);
     MedicalDocumentVO uploadDocument(Long userId, String role, Long recordId, String docType, String imageUrl);
+    /** 陪诊师在服务中订单下创建就医档案并上传单据（一条龙） */
+    MedicalDocumentVO createServiceRecord(Long escortId, Long orderId, String docType, String imageUrl);
     List<MedicalDocumentVO> getDocuments(Long userId, String role, Long recordId);
     void deleteDocument(Long userId, String role, Long documentId);
 }

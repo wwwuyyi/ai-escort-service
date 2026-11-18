@@ -38,7 +38,7 @@
             <span class="stat-icon tone-amber"><el-icon :size="21"><Clock /></el-icon></span>
             <span class="stat-kicker">待审核</span>
           </div>
-          <strong class="stat-number">{{ dashboard.pendingAudit || 0 }}</strong>
+          <strong class="stat-number">{{ dashboard.pendingAuditCount || 0 }}</strong>
           <span class="stat-caption">等待处理的资质认证申请</span>
         </article>
 
@@ -66,9 +66,9 @@
             </span>
           </div>
 
-          <div v-if="dashboard.trend7Days && dashboard.trend7Days.length > 0" class="bar-chart">
+          <div v-if="dashboard.orderTrend7Days && dashboard.orderTrend7Days.length > 0" class="bar-chart">
             <div
-              v-for="(item, index) in dashboard.trend7Days"
+              v-for="(item, index) in dashboard.orderTrend7Days"
               :key="index"
               class="bar-column"
             >
@@ -154,7 +154,7 @@ const quickLinks = [
 ]
 
 function barHeight(count) {
-  const maxCount = Math.max(...(dashboard.value.trend7Days || []).map(d => d.count), 1)
+  const maxCount = Math.max(...(dashboard.value.orderTrend7Days || []).map(d => d.count), 1)
   return Math.max((count / maxCount) * 160, 6) + 'px'
 }
 

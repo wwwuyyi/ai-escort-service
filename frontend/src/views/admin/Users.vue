@@ -106,7 +106,7 @@ const togglingId = ref(null)
 async function fetchData() {
   loading.value = true
   try {
-    const params = { page: page.value, size: size.value }
+    const params = { current: page.value, size: size.value }
     if (keyword.value) params.keyword = keyword.value
     const res = await api.get('/admin/user/page', { params })
     records.value = res.data?.records || []

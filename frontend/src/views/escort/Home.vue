@@ -305,7 +305,7 @@ onMounted(async () => {
 
   try {
     const [orderRes, notiRes] = await Promise.all([
-      api.get('/order/page', { params: { page: 1, size: 50 } }),
+      api.get('/order/page', { params: { current: 1, size: 50 } }),
       api.get('/notification/page', { params: { current: 1, size: 5 } }).catch(() => null)
     ])
     orders.value = orderRes.data?.records || []

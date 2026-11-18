@@ -13,6 +13,10 @@
           <h1 class="page-heading">就医档案</h1>
           <p class="page-sub">按就诊时间查看家人的病历摘要与相关检查报告。</p>
         </div>
+        <el-button type="primary" @click="openCreate">
+          <el-icon :size="16" style="margin-right:4px"><Plus /></el-icon>
+          新建病历
+        </el-button>
       </header>
 
       <div v-if="records.length > 0" class="records-grid">
@@ -78,19 +82,177 @@
         />
       </div>
     </main>
+
+    <!-- 新建病历（含图片上传） -->
+    <el-dialog v-model="createVisible" title="新建就医病历" width="600px" destroy-on-close>
+      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="95px">
+        <el-form-item label="就诊老人" prop="elderlyId">
+          <el-select v-model="createForm.elderlyId" placeholder="请选择老人" style="width:100%">
+            <el-option v-for="e in elderlyList" :key="e.id" :label="e.name" :value="e.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="就诊医院" prop="hospitalId">
+          <el-select v-model="createForm.hospitalId" placeholder="请选择医院" style="width:100%">
+            <el-option v-for="h in hospitalList" :key="h.id" :label="h.name" :value="h.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="就诊科室" prop="department">
+          <el-input v-model="createForm.department" maxlength="50" placeholder="如：心内科" />
+        </el-form-item>
+        <el-form-item label="就诊日期" prop="visitDate">
+          <el-date-picker v-model="createForm.visitDate" type="date" value-format="YYYY-MM-DD"
+            placeholder="选择就诊日期" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="主诉">
+          <el-input v-model="createForm.chiefComplaint" type="textarea" :rows="2" maxlength="500" />
+        </el-form-item>
+        <el-form-item label="诊断结论">
+          <el-input v-model="createForm.diagnosis" type="textarea" :rows="2" maxlength="500" />
+        </el-form-item>
+        <el-form-item label="医嘱/处方">
+          <el-input v-model="createForm.prescription" type="textarea" :rows="2" maxlength="4000" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="createForm.remark" maxlength="500" />
+        </el-form-item>
+        <el-form-item label="单据类型">
+          <el-select v-model="docType" style="width:100%">
+            <el-option label="检验单" value="LAB_REPORT" />
+            <el-option label="处方" value="PRESCRIPTION" />
+            <el-option label="病历" value="MEDICAL_RECORD" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="病历图片">
+          <el-upload
+            :action="uploadUrl"
+            :headers="uploadHeaders"
+            list-type="picture-card"
+            :limit="1"
+            :on-success="onUploadSuccess"
+            :on-error="onUploadError"
+            :on-remove="onUploadRemove"
+            :before-upload="beforeUpload"
+          >
+            <el-icon><Plus /></el-icon>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createVisible = false">取消</el-button>
+        <el-button type="primary" :loading="creating" @click="submitCreate">保存病历</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { ArrowLeft, ArrowRight, Folder } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Folder, Plus } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import api from '@/api/request'
 import FamilyTopNav from '@/components/FamilyTopNav.vue'
+import { authHeaders } from '@/utils/fileUrl'
 
 const records = ref([])
 const pageNo = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+
+const createVisible = ref(false)
+const creating = ref(false)
+const createFormRef = ref(null)
+const elderlyList = ref([])
+const hospitalList = ref([])
+const uploadedImageUrl = ref('')
+const docType = ref('MEDICAL_RECORD')
+const uploadUrl = '/api/file/upload'
+const uploadHeaders = authHeaders()
+
+const createForm = ref({
+  elderlyId: null,
+  hospitalId: null,
+  department: '',
+  visitDate: '',
+  chiefComplaint: '',
+  diagnosis: '',
+  prescription: '',
+  remark: ''
+})
+
+const createRules = {
+  elderlyId: [{ required: true, message: '请选择就诊老人', trigger: 'change' }],
+  hospitalId: [{ required: true, message: '请选择就诊医院', trigger: 'change' }],
+  department: [{ required: true, message: '请输入就诊科室', trigger: 'blur' }],
+  visitDate: [{ required: true, message: '请选择就诊日期', trigger: 'change' }]
+}
+
+async function openCreate() {
+  createForm.value = {
+    elderlyId: null, hospitalId: null, department: '', visitDate: '',
+    chiefComplaint: '', diagnosis: '', prescription: '', remark: ''
+  }
+  uploadedImageUrl.value = ''
+  docType.value = 'MEDICAL_RECORD'
+  createVisible.value = true
+  try {
+    const [elderlyRes, hospitalRes] = await Promise.all([
+      api.get('/elderly/page', { params: { current: 1, size: 100 } }),
+      api.get('/hospital/list')
+    ])
+    elderlyList.value = elderlyRes.data?.records || []
+    hospitalList.value = hospitalRes.data || []
+  } catch {
+    ElMessage.error('加载老人/医院列表失败')
+  }
+}
+
+function beforeUpload(file) {
+  const isImage = file.type === 'image/jpeg' || file.type === 'image/png'
+  const isLt5M = file.size / 1024 / 1024 < 5
+  if (!isImage) ElMessage.error('只能上传 JPG/PNG 格式的图片')
+  if (!isLt5M) ElMessage.error('图片大小不能超过 5MB')
+  return isImage && isLt5M
+}
+
+function onUploadSuccess(response) {
+  if (response?.code === 200 && typeof response.data === 'string') {
+    uploadedImageUrl.value = response.data
+    ElMessage.success('病历图片上传成功')
+  } else {
+    ElMessage.error(response?.message || '上传失败')
+  }
+}
+
+function onUploadError() {
+  ElMessage.error('病历图片上传失败')
+}
+
+function onUploadRemove() {
+  uploadedImageUrl.value = ''
+}
+
+async function submitCreate() {
+  const valid = await createFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  creating.value = true
+  try {
+    const res = await api.post('/record', createForm.value)
+    const recordId = res.data?.id
+    if (uploadedImageUrl.value && recordId) {
+      await api.post(`/record/${recordId}/document`, null, {
+        params: { docType: docType.value, imageUrl: uploadedImageUrl.value }
+      })
+    }
+    ElMessage.success('病历已保存')
+    createVisible.value = false
+    pageNo.value = 1
+    await fetchRecords()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '保存病历失败')
+  } finally {
+    creating.value = false
+  }
+}
 
 const truncateText = (text, maxLen) => {
   if (!text) return '-'

@@ -153,9 +153,97 @@ public class AiServiceImpl implements AiService {
         AiTask t = taskMapper.selectById(taskId); if (t == null) throw new BizException(ResultCode.NOT_FOUND);
         MedicalDocument d = docMapper.selectById(t.getBizId()); if (d == null) throw new BizException(ResultCode.NOT_FOUND);
         checkEscortDocAccess(userId, d, true);
-        if (dto.getCorrectedResult() != null) d.setOcrResult(dto.getCorrectedResult());
+        if (dto.getCorrectedResult() != null) {
+            Object corrected = dto.getCorrectedResult();
+            d.setOcrResult(corrected instanceof String s ? s : JSONUtil.toJsonStr(corrected));
+        }
         d.setManualConfirmed(1); d.setConfirmedBy(userId); d.setConfirmedTime(LocalDateTime.now());
         docMapper.updateById(d);
+        // OCR确认后把诊断/检查结论、检验指标回写到健康档案
+        writeBackToRecord(d);
+    }
+
+    /**
+     * 将人工确认后的OCR结果映射到 medical_record。
+     * 仅在字段为空时写入，已有内容时以“【OCR】”标记追加，保留人工录入痕迹。
+     */
+    private void writeBackToRecord(MedicalDocument d) {
+        MedicalRecord r = recordMapper.selectById(d.getRecordId());
+        if (r == null || d.getOcrResult() == null || d.getOcrResult().isBlank()) return;
+        JSONObject obj;
+        try {
+            obj = JSONUtil.parseObj(d.getOcrResult());
+        } catch (Exception e) {
+            log.warn("OCR结果不是合法JSON，跳过档案回写 documentId={}", d.getId());
+            return;
+        }
+        // Mock/第三方OCR常见外层包装 {"result":{...},"confidence":0.95}，优先取内层业务字段
+        JSONObject nested = obj.getJSONObject("result");
+        if (nested != null) obj = nested;
+        boolean changed = false;
+        String diagnosis = obj.getStr("diagnosis");
+        if (diagnosis == null || diagnosis.isBlank()) diagnosis = obj.getStr("conclusion");
+        if (diagnosis != null && !diagnosis.isBlank() && !contains(r.getDiagnosis(), diagnosis)) {
+            r.setDiagnosis(truncate(appendWithMarker(r.getDiagnosis(),
+                    String.format("【OCR】%s", truncate(diagnosis, 400))), 500));
+            changed = true;
+        }
+        String prescription = obj.getStr("prescription");
+        if (prescription != null && !prescription.isBlank() && !contains(r.getPrescription(), prescription)) {
+            r.setPrescription(appendWithMarker(r.getPrescription(), String.format("【OCR】%s", truncate(prescription, 2000))));
+            changed = true;
+        }
+        String department = obj.getStr("department");
+        if ((r.getDepartment() == null || r.getDepartment().isBlank()) && department != null && !department.isBlank()) {
+            r.setDepartment(truncate(department, 50));
+            changed = true;
+        }
+        String date = obj.getStr("date");
+        if (date != null && !date.isBlank()) {
+            try {
+                r.setVisitDate(java.time.LocalDate.parse(date));
+                changed = true;
+            } catch (Exception ignored) {
+                // OCR日期格式不合法时保留原就诊日期
+            }
+        }
+        JSONArray items = obj.getJSONArray("examItems");
+        if (items != null && !items.isEmpty()) {
+            StringBuilder summary = new StringBuilder("【OCR检验指标】");
+            boolean firstItem = true;
+            for (int i = 0; i < items.size(); i++) {
+                JSONObject item = items.getJSONObject(i);
+                if (item == null) continue;
+                if (!firstItem) summary.append("；");
+                firstItem = false;
+                summary.append(item.getStr("name", "-")).append("=").append(item.getStr("value", "-"));
+                String unit = item.getStr("unit");
+                if (unit != null && !unit.isBlank()) summary.append(unit);
+                if (Boolean.TRUE.equals(item.getBool("abnormal"))) summary.append("(异常)");
+            }
+            String text = truncate(summary.toString(), 400);
+            if (!contains(r.getRemark(), text)) {
+                r.setRemark(truncate(appendWithMarker(r.getRemark(), text), 500));
+                changed = true;
+            }
+        }
+        if (changed) {
+            recordMapper.updateById(r);
+        }
+    }
+
+    private String appendWithMarker(String existing, String addition) {
+        if (existing == null || existing.isBlank()) return addition;
+        return existing + "\n" + addition;
+    }
+
+    private boolean contains(String existing, String text) {
+        return existing != null && text != null && existing.contains(text);
+    }
+
+    private String truncate(String s, int max) {
+        if (s == null) return null;
+        return s.length() > max ? s.substring(0, max) : s;
     }
 
     @Override public ContentVO generateNotice(Long userId, NoticeGenerateDTO dto) {
@@ -382,7 +470,12 @@ public class AiServiceImpl implements AiService {
         OcrTaskVO v = new OcrTaskVO();
         v.setTaskId(t.getId()); v.setStatus(t.getStatus()); v.setErrorMsg(t.getErrorMsg());
         v.setCreateTime(t.getCreateTime());
-        if (d != null) { v.setOcrResult(d.getOcrResult()); v.setOcrConfidence(d.getOcrConfidence()); v.setManualConfirmed(d.getManualConfirmed()); }
+        if (d != null) {
+            v.setOcrResult(d.getOcrResult());
+            v.setOcrConfidence(d.getOcrConfidence());
+            v.setManualConfirmed(d.getManualConfirmed());
+            v.setImageUrl(d.getImageUrl());
+        }
         return v;
     }
 

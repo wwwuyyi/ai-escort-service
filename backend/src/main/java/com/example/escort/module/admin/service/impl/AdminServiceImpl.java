@@ -12,13 +12,18 @@ import com.example.escort.module.admin.vo.DashboardVO;
 import com.example.escort.module.admin.vo.EscortAuditDetailVO;
 import com.example.escort.module.auth.entity.SysUser;
 import com.example.escort.module.auth.mapper.SysUserMapper;
+import com.example.escort.module.elderly.entity.ElderlyProfile;
+import com.example.escort.module.elderly.mapper.ElderlyProfileMapper;
 import com.example.escort.module.escort.entity.EscortProfile;
 import com.example.escort.module.escort.mapper.EscortProfileMapper;
+import com.example.escort.module.hospital.entity.Hospital;
+import com.example.escort.module.hospital.mapper.HospitalMapper;
 import com.example.escort.module.notify.service.NotificationPublisher;
 import com.example.escort.module.order.entity.EscortOrder;
 import com.example.escort.module.order.entity.Evaluation;
 import com.example.escort.module.order.mapper.EscortOrderMapper;
 import com.example.escort.module.order.mapper.EvaluationMapper;
+import com.example.escort.module.order.vo.OrderVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +36,8 @@ public class AdminServiceImpl implements AdminService {
     private final EscortOrderMapper orderMapper;
     private final EscortProfileMapper escortMapper;
     private final SysUserMapper userMapper;
+    private final ElderlyProfileMapper elderlyMapper;
+    private final HospitalMapper hospitalMapper;
     private final EvaluationMapper evalMapper;
     private final AesUtil aesUtil;
     private final NotificationPublisher notificationPublisher;
@@ -129,12 +136,61 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public IPage<EscortOrder> orderPage(int current, int size, String status, String keyword) {
+    public IPage<OrderVO> orderPage(int current, int size, String status, String keyword) {
         LambdaQueryWrapper<EscortOrder> w = new LambdaQueryWrapper<>();
         if (status != null && !status.isEmpty()) w.eq(EscortOrder::getStatus, status);
-        if (keyword != null && !keyword.isEmpty()) w.like(EscortOrder::getOrderNo, keyword);
+        if (keyword != null && !keyword.isEmpty()) {
+            // 关键词同时匹配订单号、家属/陪诊师昵称（含登录手机号）、就诊人姓名
+            List<Long> userIds = userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                            .and(q -> q.like(SysUser::getNickname, keyword)
+                                    .or().like(SysUser::getUsername, keyword)))
+                    .stream().map(SysUser::getId).toList();
+            List<Long> elderlyIds = elderlyMapper.selectList(new LambdaQueryWrapper<ElderlyProfile>()
+                            .like(ElderlyProfile::getName, keyword))
+                    .stream().map(ElderlyProfile::getId).toList();
+            w.and(q -> {
+                q.like(EscortOrder::getOrderNo, keyword);
+                if (!userIds.isEmpty()) {
+                    q.or().in(EscortOrder::getFamilyId, userIds)
+                            .or().in(EscortOrder::getEscortId, userIds);
+                }
+                if (!elderlyIds.isEmpty()) {
+                    q.or().in(EscortOrder::getElderlyId, elderlyIds);
+                }
+            });
+        }
         w.orderByDesc(EscortOrder::getCreateTime);
-        return orderMapper.selectPage(new Page<>(current, size), w);
+        return orderMapper.selectPage(new Page<>(current, size), w).convert(this::toOrderVO);
+    }
+
+    /** 管理端订单 VO：补齐就诊人、医院、家属与陪诊师名称 */
+    private OrderVO toOrderVO(EscortOrder o) {
+        OrderVO vo = new OrderVO();
+        vo.setId(o.getId()); vo.setOrderNo(o.getOrderNo());
+        vo.setFamilyId(o.getFamilyId()); vo.setElderlyId(o.getElderlyId());
+        vo.setEscortId(o.getEscortId());
+        vo.setDepartment(o.getDepartment()); vo.setServiceType(o.getServiceType());
+        vo.setAppointmentTime(o.getAppointmentTime()); vo.setDuration(o.getDuration());
+        vo.setAmount(o.getAmount()); vo.setStatus(o.getStatus());
+        vo.setPayStatus(o.getPayStatus()); vo.setRefundAmount(o.getRefundAmount());
+        vo.setCancelReason(o.getCancelReason()); vo.setCreateTime(o.getCreateTime());
+        if (o.getFamilyId() != null) {
+            SysUser f = userMapper.selectById(o.getFamilyId());
+            if (f != null) vo.setFamilyName(f.getNickname());
+        }
+        if (o.getElderlyId() != null) {
+            ElderlyProfile e = elderlyMapper.selectById(o.getElderlyId());
+            if (e != null) vo.setElderlyName(e.getName());
+        }
+        if (o.getEscortId() != null) {
+            SysUser u = userMapper.selectById(o.getEscortId());
+            if (u != null) vo.setEscortName(u.getNickname());
+        }
+        if (o.getHospitalId() != null) {
+            Hospital h = hospitalMapper.selectById(o.getHospitalId());
+            if (h != null) vo.setHospitalName(h.getName());
+        }
+        return vo;
     }
 
     @Override

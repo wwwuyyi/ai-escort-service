@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -16,6 +17,7 @@ import java.time.LocalDate;
 public class ElderlyProfileDTO {
 
     @NotBlank(message = "姓名不能为空")
+    @Size(max = 30, message = "姓名长度不能超过30个字符")
     @Schema(description = "老人姓名", example = "张老伯")
     private String name;
 
@@ -41,6 +43,7 @@ public class ElderlyProfileDTO {
     @Schema(description = "紧急联系人电话", example = "13900139000")
     private String emergencyContact;
 
+    @Size(max = 30, message = "紧急联系人姓名长度不能超过30个字符")
     @Schema(description = "紧急联系人姓名", example = "张小明")
     private String emergencyName;
 
@@ -53,6 +56,7 @@ public class ElderlyProfileDTO {
     @Schema(description = "慢性病史")
     private String chronicDisease;
 
+    @Size(max = 500, message = "备注长度不能超过500个字符")
     @Schema(description = "备注")
     private String remark;
 }

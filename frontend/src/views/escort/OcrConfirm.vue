@@ -31,15 +31,33 @@
                 <el-icon color="var(--amber)"><WarningFilled /></el-icon>
                 <span>识别置信度较低，需人工确认</span>
               </div>
-              <el-form label-width="100px">
+              <el-alert
+                v-if="parseFailed"
+                type="warning"
+                :closable="false"
+                title="识别结果不是标准JSON，可直接编辑原始文本后确认入库"
+                style="margin-bottom: 12px;"
+              />
+              <el-form v-if="!parseFailed" label-width="110px">
                 <el-form-item
                   v-for="(value, key) in editableResult"
                   :key="key"
                   :label="key"
                 >
-                  <el-input v-model="editableResult[key]" />
+                  <el-input
+                    v-model="editableResult[key]"
+                    type="textarea"
+                    :autosize="{ minRows: 1, maxRows: 6 }"
+                  />
                 </el-form-item>
               </el-form>
+              <el-input
+                v-else
+                v-model="rawResult"
+                type="textarea"
+                :rows="10"
+                placeholder="识别结果原文"
+              />
             </el-card>
           </el-col>
 
@@ -49,10 +67,10 @@
               <template #header><span>原始图片</span></template>
               <el-image
                 v-if="task.imageUrl"
-                :src="task.imageUrl"
+                :src="displayImageUrl"
                 fit="contain"
                 style="width: 100%;"
-                :preview-src-list="[task.imageUrl]"
+                :preview-src-list="[displayImageUrl]"
               />
               <el-empty v-else description="暂无图片" />
             </el-card>
@@ -71,7 +89,7 @@
 
     <!-- Failed/Degraded State -->
     <template v-else-if="task?.status === 'FAILED' || task?.status === 'DEGRADED'">
-      <el-result icon="error" title="识别失败" :sub-title="task.errorMessage || 'OCR识别未能完成，请尝试手动录入。'">
+      <el-result icon="error" title="识别失败" :sub-title="task.errorMsg || 'OCR识别未能完成，请尝试手动录入。'">
         <template #extra>
           <el-button type="primary" @click="handleManual">手动录入</el-button>
           <el-button @click="$router.back()">返回</el-button>
@@ -87,6 +105,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Loading, WarningFilled } from '@element-plus/icons-vue'
 import api from '@/api/request'
+import { fileUrl } from '@/utils/fileUrl'
 
 const route = useRoute()
 const router = useRouter()
@@ -95,23 +114,61 @@ const loading = ref(true)
 const confirming = ref(false)
 const task = ref(null)
 const editableResult = reactive({})
+const rawResult = ref('')
+const parseFailed = ref(false)
 const progressPercent = ref(0)
 let pollTimer = null
 
-const confidence = computed(() => {
-  return task.value?.confidence ?? 0
-})
+const confidence = computed(() => Number(task.value?.ocrConfidence ?? 0))
+const displayImageUrl = computed(() => fileUrl(task.value?.imageUrl))
+
+const toEditable = v => {
+  if (v === null || v === undefined) return ''
+  if (typeof v === 'object') return JSON.stringify(v, null, 2)
+  return String(v)
+}
+
+const fromEditable = v => {
+  const s = String(v ?? '')
+  const trimmed = s.trim()
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try { return JSON.parse(trimmed) } catch { return s }
+  }
+  if (trimmed === 'true') return true
+  if (trimmed === 'false') return false
+  if (trimmed !== '' && !Number.isNaN(Number(trimmed))) return Number(trimmed)
+  return s
+}
+
+const buildCorrectedResult = () => {
+  if (parseFailed.value) return rawResult.value
+  const result = {}
+  Object.entries(editableResult).forEach(([k, v]) => { result[k] = fromEditable(v) })
+  return result
+}
 
 async function fetchTask() {
   try {
     const res = await api.get(`/ai/ocr/task/${route.params.taskId}`)
     task.value = res.data
     if (res.data?.status === 'SUCCESS') {
-      const result = res.data.result || {}
       Object.keys(editableResult).forEach(k => delete editableResult[k])
-      Object.entries(result).forEach(([k, v]) => {
-        editableResult[k] = v
-      })
+      rawResult.value = res.data.ocrResult || ''
+      try {
+        const parsed = JSON.parse(rawResult.value)
+        // 兼容 {"result":{业务字段},"confidence":0.95} 的OCR外层包装
+        const result = parsed && typeof parsed === 'object' && parsed.result &&
+          typeof parsed.result === 'object' && !Array.isArray(parsed.result)
+          ? parsed.result : parsed
+        if (result && typeof result === 'object' && !Array.isArray(result)) {
+          Object.entries(result).forEach(([k, v]) => { editableResult[k] = toEditable(v) })
+          parseFailed.value = false
+        } else {
+          parseFailed.value = true
+        }
+      } catch {
+        parseFailed.value = true
+      }
       loading.value = false
       stopPolling()
     } else if (res.data?.status === 'FAILED' || res.data?.status === 'DEGRADED') {
@@ -146,7 +203,7 @@ async function handleConfirm() {
   confirming.value = true
   try {
     await api.post(`/ai/ocr/task/${route.params.taskId}/confirm`, {
-      correctedResult: { ...editableResult }
+      correctedResult: buildCorrectedResult()
     })
     ElMessage.success('入库成功')
     router.back()

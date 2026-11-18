@@ -112,7 +112,7 @@ async function fetchData() {
   loading.value = true
   try {
     const res = await api.get('/admin/evaluation/page', {
-      params: { page: page.value, size: size.value }
+      params: { current: page.value, size: size.value }
     })
     records.value = res.data?.records || []
     total.value = res.data?.total || 0

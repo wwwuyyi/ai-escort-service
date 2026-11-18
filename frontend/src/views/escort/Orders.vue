@@ -278,7 +278,7 @@ function handleStatusChange() {
 async function fetchOrders() {
   loading.value = true
   try {
-    const params = { page: page.value, size: size.value }
+    const params = { current: page.value, size: size.value }
     if (statusFilter.value) params.status = statusFilter.value
     const res = await api.get('/order/page', { params })
     orders.value = res.data?.records || []

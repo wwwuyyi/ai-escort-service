@@ -65,9 +65,11 @@
           <el-upload
             v-model:file-list="fileList"
             :action="uploadUrl"
+            :headers="uploadHeaders"
             list-type="picture-card"
             multiple
             :on-success="onUploadSuccess"
+            :on-error="onUploadError"
             :on-remove="onRemove"
             :before-upload="beforeUpload"
           >
@@ -93,12 +95,14 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import api from '@/api/request'
+import { authHeaders } from '@/utils/fileUrl'
 
 const router = useRouter()
 const formRef = ref(null)
 const submitting = ref(false)
 const fileList = ref([])
-const uploadUrl = '/file/upload'
+const uploadUrl = '/api/file/upload'
+const uploadHeaders = authHeaders()
 
 const form = reactive({
   realName: '',
@@ -130,15 +134,21 @@ const rules = {
 }
 
 function onUploadSuccess(response) {
-  if (response?.data?.url) {
+  if (response?.code === 200 && typeof response.data === 'string') {
     const urls = form.materials ? form.materials.split(',') : []
-    urls.push(response.data.url)
+    urls.push(response.data)
     form.materials = urls.join(',')
+  } else {
+    ElMessage.error(response?.message || '材料上传失败')
   }
 }
 
+function onUploadError() {
+  ElMessage.error('材料上传失败，请确认已登录且文件格式正确')
+}
+
 function onRemove(file) {
-  const url = file.response?.data?.url || file.url
+  const url = typeof file.response?.data === 'string' ? file.response.data : file.url
   if (url) {
     const urls = form.materials.split(',').filter(u => u && u !== url)
     form.materials = urls.join(',')
