@@ -6,7 +6,7 @@ import com.example.escort.module.ai.vo.OcrTaskVO;
 
 public interface AiService {
     OcrTaskVO submitOcr(Long userId, OcrSubmitDTO dto);
-    OcrTaskVO pollOcrTask(Long taskId);
+    OcrTaskVO pollOcrTask(Long userId, Long taskId);
     void confirmOcr(Long userId, Long taskId, OcrConfirmDTO dto);
     ContentVO generateNotice(Long userId, NoticeGenerateDTO dto);
     ContentVO generateExplain(Long userId, ExplainGenerateDTO dto);

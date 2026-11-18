@@ -65,6 +65,8 @@ public class AiChatServiceImpl implements AiChatService {
         session.setContextType(contextType);
         session.setContextId(contextId);
         session.setTitle(title != null ? title : "新对话");
+        // 归属校验：禁止把其他家属的老人/订单/记录送入大模型
+        contextBuilder.validateOwnership(contextType, contextId, userId);
         // 构建系统提示词
         String systemPrompt = contextBuilder.buildSystemPrompt(contextType, contextId);
         session.setSystemPrompt(systemPrompt);
@@ -124,6 +126,8 @@ public class AiChatServiceImpl implements AiChatService {
 
     @Override
     public SseEmitter sendMessageAsync(Long userId, ChatSendDTO dto) {
+        // 在请求线程中同步完成上下文归属校验，越权时直接返回 403，而不是在 SSE 里报错
+        contextBuilder.validateOwnership(dto.getContextType(), dto.getContextId(), userId);
         SseEmitter emitter = new SseEmitter(180_000L);
         aiExecutor.execute(() -> sendMessage(userId, dto, emitter));
         return emitter;
@@ -155,6 +159,8 @@ public class AiChatServiceImpl implements AiChatService {
                 session.setContextType(dto.getContextType());
                 session.setContextId(dto.getContextId());
                 session.setTitle(title);
+                // 异步线程内二次校验，防止绕过 sendMessageAsync 直接调用
+                contextBuilder.validateOwnership(dto.getContextType(), dto.getContextId(), userId);
                 String systemPrompt = contextBuilder.buildSystemPrompt(dto.getContextType(), dto.getContextId());
                 session.setSystemPrompt(systemPrompt);
                 sessionMapper.insert(session);

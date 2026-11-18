@@ -14,6 +14,7 @@ import com.example.escort.module.auth.entity.SysUser;
 import com.example.escort.module.auth.mapper.SysUserMapper;
 import com.example.escort.module.escort.entity.EscortProfile;
 import com.example.escort.module.escort.mapper.EscortProfileMapper;
+import com.example.escort.module.notify.service.NotificationPublisher;
 import com.example.escort.module.order.entity.EscortOrder;
 import com.example.escort.module.order.entity.Evaluation;
 import com.example.escort.module.order.mapper.EscortOrderMapper;
@@ -32,6 +33,7 @@ public class AdminServiceImpl implements AdminService {
     private final SysUserMapper userMapper;
     private final EvaluationMapper evalMapper;
     private final AesUtil aesUtil;
+    private final NotificationPublisher notificationPublisher;
 
     @Override
     public DashboardVO dashboard() {
@@ -74,6 +76,10 @@ public class AdminServiceImpl implements AdminService {
                 .set(EscortProfile::getAuditTime, LocalDateTime.now())
                 .set(EscortProfile::getAuditorId, adminId));
         if (rows == 0) throw new BizException(ResultCode.CONFLICT, "该申请不是待审核状态");
+        String result = "APPROVED".equals(status) ? "已通过" : "未通过";
+        notificationPublisher.publishAfterCommit(escortUserId, "资质审核结果",
+                "您的陪诊师资质审核" + result + "。" + (remark != null && !remark.isBlank() ? "备注：" + remark : ""),
+                "AUDIT", escortUserId);
     }
 
     @Override
@@ -113,8 +119,13 @@ public class AdminServiceImpl implements AdminService {
         SysUser u = userMapper.selectById(userId);
         if (u != null && "ADMIN".equals(u.getRole()) && "DISABLED".equals(status))
             throw new BizException(ResultCode.BAD_REQUEST, "禁止禁用管理员账号");
-        userMapper.update(null, new LambdaUpdateWrapper<SysUser>()
-                .eq(SysUser::getId, userId).set(SysUser::getStatus, status));
+        LambdaUpdateWrapper<SysUser> update = new LambdaUpdateWrapper<SysUser>()
+                .eq(SysUser::getId, userId).set(SysUser::getStatus, status);
+        // 禁用时递增令牌版本号，解禁后旧 Token 也不会重新生效
+        if ("DISABLED".equals(status)) {
+            update.setSql("token_version = token_version + 1");
+        }
+        userMapper.update(null, update);
     }
 
     @Override

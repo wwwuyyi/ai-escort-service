@@ -1,5 +1,6 @@
 package com.example.escort.security;
 
+import com.example.escort.module.auth.entity.SysUser;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -10,15 +11,18 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * 登录拦截器
  * 对所有非公开接口校验JWT Token，解析后写入UserContext。
  * 公开接口（登录/注册/验证码/Knife4j文档）在 WebMvcConfig 中排除。
+ *
+ * 除签名/过期外，还会校验用户当前状态与令牌版本号：
+ * 账号被禁用、用户登出或修改密码后，旧 Token 立即失效。
  */
 @Slf4j
 @Component
 public class LoginInterceptor implements HandlerInterceptor {
 
-    private final JwtUtil jwtUtil;
+    private final TokenAuthService tokenAuthService;
 
-    public LoginInterceptor(JwtUtil jwtUtil) {
-        this.jwtUtil = jwtUtil;
+    public LoginInterceptor(TokenAuthService tokenAuthService) {
+        this.tokenAuthService = tokenAuthService;
     }
 
     @Override
@@ -29,7 +33,8 @@ public class LoginInterceptor implements HandlerInterceptor {
         }
 
         String token = extractToken(request);
-        if (token == null || !jwtUtil.validateToken(token)) {
+        SysUser user = tokenAuthService.authenticate(token);
+        if (user == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json;charset=UTF-8");
             try {
@@ -40,8 +45,8 @@ public class LoginInterceptor implements HandlerInterceptor {
         }
 
         // 写入上下文
-        UserContext.setUserId(jwtUtil.getUserId(token));
-        UserContext.setUserRole(jwtUtil.getUserRole(token));
+        UserContext.setUserId(user.getId());
+        UserContext.setUserRole(user.getRole());
         return true;
     }
 

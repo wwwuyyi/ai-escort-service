@@ -18,6 +18,9 @@ public class SysUser {
     private String phone;
     private String role;
     private String status;
+    /** JWT令牌版本号：登出/改密/禁用时递增，使旧令牌立即失效 */
+    @JsonIgnore
+    private Integer tokenVersion;
     private LocalDateTime lastLoginTime;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

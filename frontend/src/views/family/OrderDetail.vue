@@ -114,7 +114,7 @@
           v-model="cancelReason"
           type="textarea"
           :rows="3"
-          placeholder="请输入取消原因（选填）"
+          placeholder="请输入取消原因（订单已被接单时必须填写）"
           class="cancel-input"
         />
       </div>
@@ -169,7 +169,7 @@ const handleCancel = async () => {
   canceling.value = true
   try {
     const res = await api.put(`/order/${route.params.id}/cancel`, {
-      reason: cancelReason.value
+      cancelReason: cancelReason.value
     })
     if (res.code === 200) {
       ElMessage.success('订单已取消')

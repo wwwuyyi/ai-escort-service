@@ -1,6 +1,7 @@
 package com.example.escort.config;
 
 import com.example.escort.security.LoginInterceptor;
+import com.example.escort.security.UploadAuthInterceptor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -18,6 +19,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final LoginInterceptor loginInterceptor;
+    private final UploadAuthInterceptor uploadAuthInterceptor;
 
     /**
      * 跨域域名白名单，来自 application.yml 的 cors.allowed-origins。
@@ -26,8 +28,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Value("${cors.allowed-origins:http://localhost:5173}")
     private String[] allowedOrigins;
 
-    public WebMvcConfig(LoginInterceptor loginInterceptor) {
+    public WebMvcConfig(LoginInterceptor loginInterceptor,
+                        UploadAuthInterceptor uploadAuthInterceptor) {
         this.loginInterceptor = loginInterceptor;
+        this.uploadAuthInterceptor = uploadAuthInterceptor;
     }
 
     /**
@@ -62,6 +66,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/v3/api-docs/**",
                         "/swagger-resources/**"
                 );
+        // 上传文件为敏感医疗数据：/upload/** 必须登录后访问
+        registry.addInterceptor(uploadAuthInterceptor)
+                .addPathPatterns("/upload/**");
     }
 
     /**

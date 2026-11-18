@@ -135,10 +135,13 @@ public class AiServiceImpl implements AiService {
     private static class OcrParsed { String json; BigDecimal confidence; boolean lowConf;
         OcrParsed(String j, BigDecimal c, boolean l) { json=j; confidence=c; lowConf=l; } }
 
-    @Override public OcrTaskVO pollOcrTask(Long taskId) {
+    @Override public OcrTaskVO pollOcrTask(Long userId, Long taskId) {
         AiTask t = taskMapper.selectById(taskId);
-        if (t == null) throw new BizException(ResultCode.NOT_FOUND);
+        if (t == null || !"OCR".equals(t.getTaskType())) throw new BizException(ResultCode.NOT_FOUND);
         MedicalDocument d = docMapper.selectById(t.getBizId());
+        if (d == null) throw new BizException(ResultCode.NOT_FOUND);
+        // 归属校验：仅该老人关联订单的陪诊师可轮询（与确认接口保持一致）
+        checkEscortDocAccess(userId, d, false);
         OcrTaskVO vo = toOcrVO(t, d);
         if (d != null && d.getOcrConfidence() != null && d.getOcrConfidence().compareTo(new BigDecimal("0.85")) < 0)
             vo.setErrorMsg((vo.getErrorMsg()!=null?vo.getErrorMsg()+";":"")+"置信度<0.85需人工确认");
@@ -301,16 +304,37 @@ public class AiServiceImpl implements AiService {
         return toContentVO(c);
     }
 
+    /**
+     * AI 内容归属校验：
+     * - ADMIN 可查看全部（人工复核场景）
+     * - FAMILY 按订单/档案归属校验
+     * - ESCORT 仅可查看已指派给自己的订单/老人相关内容，禁止直接放行
+     */
     private void checkContentOwner(Long uid, String role, AiGeneratedContent c) {
-        if (!"FAMILY".equals(role)) return;
+        if ("ADMIN".equals(role)) return;
         if ("NOTICE".equals(c.getContentType())) {
             EscortOrder o = orderMapper.selectById(c.getBizId());
-            if (o == null || !o.getFamilyId().equals(uid)) throw new BizException(ResultCode.FORBIDDEN);
+            if (o == null) throw new BizException(ResultCode.NOT_FOUND);
+            boolean allowed = "FAMILY".equals(role)
+                    ? o.getFamilyId().equals(uid)
+                    : "ESCORT".equals(role) && uid.equals(o.getEscortId());
+            if (!allowed) throw new BizException(ResultCode.FORBIDDEN);
         } else if ("EXPLAIN".equals(c.getContentType())) {
             MedicalRecord r = recordMapper.selectById(c.getBizId());
             if (r == null) throw new BizException(ResultCode.NOT_FOUND);
-            ElderlyProfile e = elderlyMapper.selectById(r.getElderlyId());
-            if (e == null || !e.getFamilyId().equals(uid)) throw new BizException(ResultCode.FORBIDDEN);
+            if ("FAMILY".equals(role)) {
+                ElderlyProfile e = elderlyMapper.selectById(r.getElderlyId());
+                if (e == null || !e.getFamilyId().equals(uid)) throw new BizException(ResultCode.FORBIDDEN);
+            } else if ("ESCORT".equals(role)) {
+                Long count = orderMapper.selectCount(new LambdaQueryWrapper<EscortOrder>()
+                        .eq(EscortOrder::getEscortId, uid)
+                        .eq(EscortOrder::getElderlyId, r.getElderlyId()));
+                if (count == 0) throw new BizException(ResultCode.FORBIDDEN);
+            } else {
+                throw new BizException(ResultCode.FORBIDDEN);
+            }
+        } else {
+            throw new BizException(ResultCode.FORBIDDEN);
         }
     }
 

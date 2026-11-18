@@ -66,10 +66,12 @@ public class UserServiceImpl implements UserService {
         if (!BCrypt.checkpw(dto.getOldPassword(), user.getPassword())) {
             throw new BizException(ResultCode.BAD_REQUEST, "旧密码不正确");
         }
-        // 更新为新密码
+        // 更新为新密码，并递增令牌版本号使改密前的旧 Token 全部失效
         user.setPassword(BCrypt.hashpw(dto.getNewPassword()));
+        int currentVersion = user.getTokenVersion() == null ? 0 : user.getTokenVersion();
+        user.setTokenVersion(currentVersion + 1);
         sysUserMapper.updateById(user);
-        log.info("用户修改密码成功: userId={}", userId);
+        log.info("用户修改密码成功: userId={}, 旧Token已失效", userId);
     }
 
     @Override

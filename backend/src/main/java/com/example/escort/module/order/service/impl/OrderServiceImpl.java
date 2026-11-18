@@ -14,6 +14,7 @@ import com.example.escort.module.escort.entity.EscortProfile;
 import com.example.escort.module.escort.mapper.EscortProfileMapper;
 import com.example.escort.module.hospital.entity.Hospital;
 import com.example.escort.module.hospital.mapper.HospitalMapper;
+import com.example.escort.module.notify.service.NotificationPublisher;
 import com.example.escort.module.order.dto.*;
 import com.example.escort.module.order.entity.*;
 import com.example.escort.module.order.enums.OrderStatus;
@@ -59,6 +60,7 @@ public class OrderServiceImpl implements OrderService {
     private final EscortProfileMapper escortProfileMapper;
     private final HospitalMapper hospitalMapper;
     private final SysUserMapper userMapper;
+    private final NotificationPublisher notificationPublisher;
 
     @Value("${order.price.base-per-hour:50}")
     private BigDecimal basePricePerHour;
@@ -94,6 +96,10 @@ public class OrderServiceImpl implements OrderService {
         if (dto.getAmount().compareTo(estimate(estDTO).getTotalAmount()) != 0)
             throw new BizException(ResultCode.BAD_REQUEST, "金额与试算结果不一致");
 
+        // 幂等查询必须按 familyId 隔离：其他家属复用同一 requestId 时不得返回他人订单
+        EscortOrder existing = findExistingOrder(familyId, dto.getRequestId());
+        if (existing != null) return toVO(existing);
+
         EscortOrder order = buildOrder(familyId, dto);
         // 订单号+insert同一循环（最多3次）
         for (int i = 0; i < 3; i++) {
@@ -102,17 +108,16 @@ public class OrderServiceImpl implements OrderService {
                 orderMapper.insert(order);
                 break;
             } catch (DuplicateKeyException e) {
-                String msg = e.getMessage();
-                if (msg != null && msg.contains("uk_request_id")) {
-                    EscortOrder exist = orderMapper.selectOne(
-                            new LambdaQueryWrapper<EscortOrder>().eq(EscortOrder::getRequestId, dto.getRequestId()));
-                    if (exist != null) return toVO(exist);
-                }
-                if (i == 2) throw new BizException(ResultCode.TOO_MANY_REQUESTS, "订单创建失败，请稍后重试");
-                log.warn("订单号冲突重试 {}/3", i + 1);
+                // 仅按 (requestId, familyId) 查询；查不到说明冲突来自其他家属/其他唯一键
+                EscortOrder exist = findExistingOrder(familyId, dto.getRequestId());
+                if (exist != null) return toVO(exist);
+                if (i == 2) throw new BizException(ResultCode.CONFLICT, "请求编号已被占用，请重新提交");
+                log.warn("订单号或请求号冲突重试 {}/3", i + 1);
             }
         }
         writeStatusLog(order.getId(), order.getOrderNo(), null, "PENDING_DISPATCH", familyId, "FAMILY", "用户下单");
+        notificationPublisher.publishAfterCommit(familyId, "下单成功",
+                "订单 " + order.getOrderNo() + " 已提交，等待平台派单。", "ORDER", order.getId());
         log.info("订单创建: orderNo={}, familyId={}", order.getOrderNo(), familyId);
         return toVO(order);
     }
@@ -169,6 +174,10 @@ public class OrderServiceImpl implements OrderService {
                         .setSql("version = version + 1"));
         if (rows == 0) throw new BizException(ResultCode.CONFLICT, "订单状态已变更");
         writeStatusLog(orderId, order.getOrderNo(), cur.name(), "CANCELLED", userId, role, dto.getCancelReason());
+        String refundTip = order.getRefundAmount() != null
+                ? "，退款金额 " + order.getRefundAmount().setScale(2, RoundingMode.HALF_UP) + " 元" : "";
+        notificationPublisher.publishAfterCommit(order.getFamilyId(), "订单已取消",
+                "订单 " + order.getOrderNo() + " 已取消" + refundTip + "。", "ORDER", orderId);
     }
 
     @Override
@@ -194,6 +203,10 @@ public class OrderServiceImpl implements OrderService {
                         .setSql("version = version + 1"));
         if (rows == 0) throw new BizException(ResultCode.CONFLICT, "订单状态已变更");
         writeStatusLog(orderId, order.getOrderNo(), cur, "DISPATCHED", adminId, "ADMIN", "派单给:" + escortId);
+        notificationPublisher.publishAfterCommit(escortId, "新的陪诊订单",
+                "订单 " + order.getOrderNo() + " 已指派给您，请及时接单。", "ORDER", orderId);
+        notificationPublisher.publishAfterCommit(order.getFamilyId(), "订单已派单",
+                "订单 " + order.getOrderNo() + " 已派单给陪诊师。", "ORDER", orderId);
     }
 
     @Override
@@ -212,6 +225,8 @@ public class OrderServiceImpl implements OrderService {
                         .set(EscortOrder::getStatus, "ACCEPTED").setSql("version = version + 1"));
         if (rows == 0) throw new BizException(ResultCode.CONFLICT, "订单状态已变更");
         writeStatusLog(orderId, o.getOrderNo(), cur, "ACCEPTED", escortId, "ESCORT", "接单");
+        notificationPublisher.publishAfterCommit(o.getFamilyId(), "陪诊师已接单",
+                "订单 " + o.getOrderNo() + " 的陪诊师已接单，请按预约时间就诊。", "ORDER", orderId);
     }
 
     @Override
@@ -231,6 +246,8 @@ public class OrderServiceImpl implements OrderService {
                         .setSql("version = version + 1"));
         if (rows == 0) throw new BizException(ResultCode.CONFLICT, "订单状态已变更");
         writeStatusLog(orderId, o.getOrderNo(), cur, "PENDING_DISPATCH", escortId, "ESCORT", "拒单");
+        notificationPublisher.publishAfterCommit(o.getFamilyId(), "陪诊师已拒单",
+                "订单 " + o.getOrderNo() + " 被陪诊师拒绝，平台将重新派单。", "ORDER", orderId);
     }
 
     @Override
@@ -251,6 +268,8 @@ public class OrderServiceImpl implements OrderService {
                         .set(EscortOrder::getStatus, "IN_SERVICE").setSql("version = version + 1"));
         if (rows == 0) throw new BizException(ResultCode.CONFLICT, "订单状态已变更");
         writeStatusLog(orderId, o.getOrderNo(), cur, "IN_SERVICE", escortId, "ESCORT", "开始服务");
+        notificationPublisher.publishAfterCommit(o.getFamilyId(), "陪诊师已开始服务",
+                "订单 " + o.getOrderNo() + " 的陪诊服务已开始。", "ORDER", orderId);
     }
 
     @Override
@@ -269,6 +288,8 @@ public class OrderServiceImpl implements OrderService {
                         .set(EscortOrder::getStatus, "SERVICE_FINISHED").setSql("version = version + 1"));
         if (rows == 0) throw new BizException(ResultCode.CONFLICT, "订单状态已变更");
         writeStatusLog(orderId, o.getOrderNo(), cur, "SERVICE_FINISHED", escortId, "ESCORT", "服务结束");
+        notificationPublisher.publishAfterCommit(o.getFamilyId(), "服务已结束",
+                "订单 " + o.getOrderNo() + " 的陪诊服务已结束，等待平台结算。", "ORDER", orderId);
     }
 
     @Override
@@ -294,6 +315,9 @@ public class OrderServiceImpl implements OrderService {
         s.setPlatformFee(pf); s.setEscortIncome(ei); s.setSettleStatus("SETTLED"); s.setOperatorId(adminId);
         settlementMapper.insert(s);
         writeStatusLog(orderId, o.getOrderNo(), cur, "SETTLED", adminId, "ADMIN", "结算完成");
+        notificationPublisher.publishAfterCommit(o.getEscortId(), "订单已结算",
+                "订单 " + o.getOrderNo() + " 已结算，您的收入 " + ei.setScale(2, RoundingMode.HALF_UP) + " 元。",
+                "SETTLEMENT", orderId);
     }
 
     @Override
@@ -319,6 +343,8 @@ public class OrderServiceImpl implements OrderService {
         if (rows == 0) throw new BizException(ResultCode.CONFLICT, "订单状态已变更");
         updateEscortRating(o.getEscortId());
         writeStatusLog(orderId, o.getOrderNo(), cur, "COMPLETED", familyId, "FAMILY", "评价:" + dto.getScore() + "分");
+        notificationPublisher.publishAfterCommit(o.getEscortId(), "收到新的服务评价",
+                "订单 " + o.getOrderNo() + " 收到家属评价：" + dto.getScore() + " 星。", "ORDER", orderId);
     }
 
     @Override
@@ -339,6 +365,12 @@ public class OrderServiceImpl implements OrderService {
     }
 
     // ---- private helpers ----
+
+    private EscortOrder findExistingOrder(Long familyId, String requestId) {
+        return orderMapper.selectOne(new LambdaQueryWrapper<EscortOrder>()
+                .eq(EscortOrder::getRequestId, requestId)
+                .eq(EscortOrder::getFamilyId, familyId));
+    }
 
     private EscortOrder buildOrder(Long familyId, OrderCreateDTO dto) {
         EscortOrder o = new EscortOrder();

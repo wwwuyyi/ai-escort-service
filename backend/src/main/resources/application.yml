@@ -37,9 +37,9 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     map-underscore-to-camel-case: true
 
-# JWT配置
+# JWT配置（必须通过环境变量注入，未配置时后端拒绝启动）
 jwt:
-  secret: ${JWT_SECRET:escort-jwt-secret-key-2026-please-change-in-production}
+  secret: ${JWT_SECRET:}
   expiration: 7200  # 2小时，单位秒
 
 # AI服务配置（占位符，以主流公开API为例，具体实现需参考对应官方文档）

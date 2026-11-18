@@ -108,8 +108,9 @@ public class AuthServiceImpl implements AuthService {
                     "该账号不是" + roleLabel + "账号，请切换到对应端口登录");
         }
 
-        // 签发JWT
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
+        // 签发JWT（携带当前令牌版本号，登出/改密/禁用后旧令牌失效）
+        int tokenVersion = user.getTokenVersion() == null ? 0 : user.getTokenVersion();
+        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole(), tokenVersion);
 
         // 更新最后登录时间
         user.setLastLoginTime(LocalDateTime.now());
@@ -127,12 +128,16 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void logout(String token) {
-        // 无状态JWT，登出由前端清除Token即可。
-        // 后端此处仅记录审计日志。
+        // 递增令牌版本号，使该用户已签发的所有 Token 立即失效（服务端登出）
         Long userId = jwtUtil.getUserId(token);
         if (userId != null) {
-            log.info("用户登出: userId={}", userId);
+            sysUserMapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                            .eq(SysUser::getId, userId)
+                            .setSql("token_version = token_version + 1"));
+            log.info("用户登出: userId={}, 旧Token已失效", userId);
         }
     }
 
@@ -158,7 +163,6 @@ public class AuthServiceImpl implements AuthService {
      * 校验验证码（从HttpSession取值比对后立即删除，防止重复使用）
      */
     private void validateCaptcha(String captchaKey, String captchaInput) {
-        if ("test-bypass".equals(captchaKey)) return;
         HttpSession session = request.getSession(false);
         if (session == null) throw new BizException(ResultCode.BAD_REQUEST, "验证码已过期，请重新获取");
         String storedCode = (String) session.getAttribute(CAPTCHA_SESSION_PREFIX + captchaKey);

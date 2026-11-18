@@ -26,7 +26,7 @@ public class AiController {
     @Operation(summary = "轮询OCR结果")
     @GetMapping("/ocr/task/{taskId}") @RequireRole("ESCORT")
     public Result<OcrTaskVO> pollOcr(@PathVariable Long taskId) {
-        return Result.ok(aiService.pollOcrTask(taskId)); }
+        return Result.ok(aiService.pollOcrTask(UserContext.getUserId(), taskId)); }
 
     @Operation(summary = "确认OCR（可修正）")
     @PostMapping("/ocr/task/{taskId}/confirm") @RequireRole("ESCORT")

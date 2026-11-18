@@ -1,6 +1,14 @@
 @echo off
 chcp 936 >nul
 setlocal EnableDelayedExpansion
+
+REM ---------- JWT 密钥 ----------
+REM 安全要求：后端在未配置 JWT_SECRET 时拒绝启动。
+REM 本机演示未设置时自动生成本次运行专用的随机密钥（重启后旧令牌失效）。
+if not defined JWT_SECRET (
+    for /f "delims=" %%i in ('powershell -NoProfile -Command "[guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')"') do set JWT_SECRET=%%i
+    echo [SECURITY] 未检测到 JWT_SECRET，已生成本次运行专用的随机密钥
+)
 REM ============================================
 REM AI赋能陪诊助医服务系统 - 一键启动
 REM 用法：双击本文件

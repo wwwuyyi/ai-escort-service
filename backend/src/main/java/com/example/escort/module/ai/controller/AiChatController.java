@@ -1,5 +1,6 @@
 package com.example.escort.module.ai.controller;
 
+import com.example.escort.common.BizException;
 import com.example.escort.common.Result;
 import com.example.escort.module.ai.dto.ChatSendDTO;
 import com.example.escort.module.ai.service.AiChatService;
@@ -11,7 +12,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -62,10 +65,24 @@ public class AiChatController {
     }
 
     @Operation(summary = "发送消息（SSE流式返回AI回复）")
-    @PostMapping(value = "/send", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping("/send")
     @RequireRole("FAMILY")
     public SseEmitter sendMessage(@Valid @RequestBody ChatSendDTO dto) {
-        // 异步执行：controller立即返回emitter，事件才能实时下发而不是被缓冲到结束
+        // 异步执行：controller立即返回emitter，事件才能实时下发而不是被缓冲到结束。
+        // 上下文归属校验在 sendMessageAsync 内同步完成，越权时返回 JSON 403。
         return aiChatService.sendMessageAsync(UserContext.getUserId(), dto);
+    }
+
+    /**
+     * 该接口成功时返回 text/event-stream，无法用统一的 JSON 错误体协商；
+     * 在此将业务异常显式映射为对应的 HTTP 状态（如 403/404）与 JSON 返回体。
+     */
+    @ExceptionHandler(BizException.class)
+    public ResponseEntity<Result<Void>> handleBizException(BizException e) {
+        HttpStatus status = e.getCode() >= 400 && e.getCode() < 600
+                ? HttpStatus.valueOf(e.getCode()) : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Result.fail(e.getCode(), e.getMessage()));
     }
 }

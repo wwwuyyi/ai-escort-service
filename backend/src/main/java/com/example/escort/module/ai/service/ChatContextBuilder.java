@@ -1,6 +1,8 @@
 package com.example.escort.module.ai.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.escort.common.BizException;
+import com.example.escort.common.ResultCode;
 import com.example.escort.module.elderly.entity.ElderlyProfile;
 import com.example.escort.module.elderly.mapper.ElderlyProfileMapper;
 import com.example.escort.module.order.entity.EscortOrder;
@@ -42,6 +44,35 @@ public class ChatContextBuilder {
             "\n" +
             "【免责声明】\n" +
             "AI生成内容仅供参考，不构成任何诊疗建议。如有健康问题请及时就医。";
+
+    /**
+     * 校验对话上下文归属：只能使用当前家属自己的老人/订单/就医记录。
+     * 必须在同步请求线程中调用，越权时直接抛出 403，避免异步 SSE 已开始后才失败。
+     */
+    public void validateOwnership(String contextType, Long contextId, Long userId) {
+        if (contextType == null || contextId == null) return;
+        switch (contextType.toUpperCase()) {
+            case "ELDERLY" -> {
+                ElderlyProfile e = elderlyMapper.selectById(contextId);
+                if (e == null) throw new BizException(ResultCode.NOT_FOUND, "老人档案不存在");
+                if (!e.getFamilyId().equals(userId)) throw new BizException(ResultCode.FORBIDDEN);
+            }
+            case "ORDER" -> {
+                EscortOrder o = orderMapper.selectById(contextId);
+                if (o == null) throw new BizException(ResultCode.NOT_FOUND, "订单不存在");
+                if (!o.getFamilyId().equals(userId)) throw new BizException(ResultCode.FORBIDDEN);
+            }
+            case "RECORD" -> {
+                MedicalRecord r = recordMapper.selectById(contextId);
+                if (r == null) throw new BizException(ResultCode.NOT_FOUND, "就医档案不存在");
+                ElderlyProfile e = elderlyMapper.selectById(r.getElderlyId());
+                if (e == null || !e.getFamilyId().equals(userId)) {
+                    throw new BizException(ResultCode.FORBIDDEN);
+                }
+            }
+            default -> { /* GENERAL 或无上下文 */ }
+        }
+    }
 
     /**
      * 根据上下文类型构建system prompt
