@@ -21,12 +21,12 @@
         <el-descriptions :column="2" border>
           <el-descriptions-item label="订单编号">{{ order.orderNo }}</el-descriptions-item>
           <el-descriptions-item label="就诊人">{{ order.elderlyName }}</el-descriptions-item>
-          <el-descriptions-item label="预约时间">{{ order.appointmentTime }}</el-descriptions-item>
+          <el-descriptions-item label="预约时间">{{ formatDateTime(order.appointmentTime) }}</el-descriptions-item>
           <el-descriptions-item label="就诊科室">{{ order.department }}</el-descriptions-item>
           <el-descriptions-item label="就诊医院">{{ order.hospitalName || order.hospital || "—" }}</el-descriptions-item>
           <el-descriptions-item label="服务城市">{{ order.serviceCity }}</el-descriptions-item>
           <el-descriptions-item label="备注">{{ order.remark || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="创建时间">{{ order.createTime }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间">{{ formatDateTime(order.createTime) }}</el-descriptions-item>
         </el-descriptions>
       </el-card>
 
@@ -49,7 +49,7 @@
           <el-timeline-item
             v-for="item in timeline"
             :key="item.status"
-            :timestamp="item.time"
+            :timestamp="formatDateTime(item.time)"
             :type="item.type"
           >
             {{ item.label }}
@@ -126,6 +126,7 @@ import { ArrowLeft, Plus } from '@element-plus/icons-vue'
 import api from '@/api/request'
 import { getOrderStatusLabel, getOrderStatusType, getOrderStatusClass } from '@/utils/orderStatus'
 import { authHeaders } from '@/utils/fileUrl'
+import { formatDateTime } from '@/utils/datetime'
 
 const route = useRoute()
 const router = useRouter()
@@ -262,6 +263,10 @@ function beforeDocUpload(file) {
 async function handleCreateRecord() {
   if (!docType.value || !uploadedDocUrl.value) {
     ElMessage.warning('请选择单据类型并上传图片')
+    return
+  }
+  if (documentId.value) {
+    ElMessage.info('单据已创建，可直接发起OCR识别')
     return
   }
   creating.value = true

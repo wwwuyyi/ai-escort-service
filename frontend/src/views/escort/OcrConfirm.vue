@@ -67,10 +67,10 @@
               <template #header><span>原始图片</span></template>
               <el-image
                 v-if="task.imageUrl"
-                :src="displayImageUrl"
+                :src="imageSrc"
                 fit="contain"
                 style="width: 100%;"
-                :preview-src-list="[displayImageUrl]"
+                :preview-src-list="[imageSrc]"
               />
               <el-empty v-else description="暂无图片" />
             </el-card>
@@ -100,12 +100,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Loading, WarningFilled } from '@element-plus/icons-vue'
 import api from '@/api/request'
-import { fileUrl } from '@/utils/fileUrl'
+import { signedFileUrl } from '@/utils/fileUrl'
 
 const route = useRoute()
 const router = useRouter()
@@ -120,7 +120,10 @@ const progressPercent = ref(0)
 let pollTimer = null
 
 const confidence = computed(() => Number(task.value?.ocrConfidence ?? 0))
-const displayImageUrl = computed(() => fileUrl(task.value?.imageUrl))
+const imageSrc = ref('')
+watch(() => task.value?.imageUrl, async path => {
+  imageSrc.value = path ? await signedFileUrl(path).catch(() => '') : ''
+}, { immediate: true })
 
 const toEditable = v => {
   if (v === null || v === undefined) return ''

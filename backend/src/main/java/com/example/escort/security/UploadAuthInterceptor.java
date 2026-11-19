@@ -1,6 +1,8 @@
 package com.example.escort.security;
 
+import com.example.escort.common.BizException;
 import com.example.escort.module.auth.entity.SysUser;
+import com.example.escort.module.file.service.FileAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -8,18 +10,22 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
- * 上传文件访问拦截器
- * 病历图片/资质材料属于敏感医疗数据，/upload/** 不再匿名公开。
+ * 上传文件访问拦截器（兼容旧 /upload/** 直链）。
  *
- * Token 来源：Authorization: Bearer {token}；图片标签无法携带请求头时允许 ?token={token}。
- * 注意：该拦截器只负责认证，不做逐文件归属校验（文件与业务实体的绑定关系在
- * medical_document / escort_profile.materials 中维护，属于后续细粒度 ACL 范围）。
+ * 安全语义（REG-001）：
+ * - 匿名访问 → 401
+ * - 已登录但无业务归属 → 403/404
+ * - 仅接受 Authorization: Bearer 请求头，不再接受 URL 中的长期 JWT（REG-002）
+ *
+ * 前端展示图片统一改用 /api/file/signed-url 获取短期签名 URL；
+ * /upload/** 保留给直接接口调用与兼容，但仍执行对象级授权。
  */
 @Component
 @RequiredArgsConstructor
 public class UploadAuthInterceptor implements HandlerInterceptor {
 
     private final TokenAuthService tokenAuthService;
+    private final FileAccessService fileAccessService;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
@@ -31,15 +37,28 @@ public class UploadAuthInterceptor implements HandlerInterceptor {
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
         } else {
-            token = request.getParameter("token");
+            token = null; // 明确拒绝 ?token= 传参，避免长期 JWT 进入 URL
         }
         SysUser user = tokenAuthService.authenticate(token);
         if (user == null) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"code\":401,\"message\":\"未登录或Token已失效\",\"data\":null}");
+            writeError(response, HttpServletResponse.SC_UNAUTHORIZED, 401, "未登录或Token已失效");
+            return false;
+        }
+        try {
+            fileAccessService.assertCanAccess(user.getId(), user.getRole(), request.getRequestURI());
+        } catch (BizException e) {
+            writeError(response, e.getCode() == 404 ? 404 : 403, e.getCode(), e.getMessage());
             return false;
         }
         return true;
+    }
+
+    private void writeError(HttpServletResponse response, int httpStatus, int code, String message)
+            throws Exception {
+        response.setStatus(httpStatus);
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write(String.format(
+                "{\"code\":%d,\"message\":\"%s\",\"data\":null}", code,
+                message == null ? "无权限访问该文件" : message.replace("\"", "'")));
     }
 }

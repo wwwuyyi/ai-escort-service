@@ -20,6 +20,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     private final LoginInterceptor loginInterceptor;
     private final UploadAuthInterceptor uploadAuthInterceptor;
+    private final ApiDocsGuardInterceptor apiDocsGuardInterceptor;
 
     /**
      * 跨域域名白名单，来自 application.yml 的 cors.allowed-origins。
@@ -29,9 +30,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private String[] allowedOrigins;
 
     public WebMvcConfig(LoginInterceptor loginInterceptor,
-                        UploadAuthInterceptor uploadAuthInterceptor) {
+                        UploadAuthInterceptor uploadAuthInterceptor,
+                        ApiDocsGuardInterceptor apiDocsGuardInterceptor) {
         this.loginInterceptor = loginInterceptor;
         this.uploadAuthInterceptor = uploadAuthInterceptor;
+        this.apiDocsGuardInterceptor = apiDocsGuardInterceptor;
     }
 
     /**
@@ -60,15 +63,25 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/auth/captcha",
                         "/api/auth/register",
                         "/api/auth/login",
+                        // 受控下载由短期签名保护，图片标签无法携带 Authorization
+                        "/api/file/download",
                         "/upload/**",
                         "/doc.html",
                         "/webjars/**",
                         "/v3/api-docs/**",
                         "/swagger-resources/**"
                 );
-        // 上传文件为敏感医疗数据：/upload/** 必须登录后访问
+        // 上传文件为敏感医疗数据：/upload/** 必须登录且按业务归属授权
         registry.addInterceptor(uploadAuthInterceptor)
                 .addPathPatterns("/upload/**");
+        // 接口文档默认关闭（设置 API_DOCS_ENABLED=true 可按需开启）
+        registry.addInterceptor(apiDocsGuardInterceptor)
+                .addPathPatterns(
+                        "/doc.html",
+                        "/v3/api-docs/**",
+                        "/swagger-resources/**",
+                        "/webjars/**"
+                );
     }
 
     /**

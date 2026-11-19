@@ -25,7 +25,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="content" label="评价内容" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="createTime" label="评价时间" width="180" />
+        <el-table-column label="评价时间" width="180">
+          <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
+        </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :class="row.isHidden ? 'status-tag status-tag--danger' : 'status-tag status-tag--done'">
@@ -95,6 +97,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Star } from '@element-plus/icons-vue'
 import api from '@/api/request'
+import { formatDateTime } from '@/utils/datetime'
 
 const loading = ref(false)
 const hiding = ref(false)

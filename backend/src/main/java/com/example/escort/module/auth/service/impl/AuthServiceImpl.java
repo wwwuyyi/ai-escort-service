@@ -73,6 +73,8 @@ public class AuthServiceImpl implements AuthService {
         SysUser user = new SysUser();
         user.setUsername(dto.getUsername());
         user.setPassword(BCrypt.hashpw(dto.getPassword())); // BCrypt加密
+        // BUG-025：注册账号即手机号，同时写入 phone 便于管理端展示
+        user.setPhone(dto.getUsername());
         user.setNickname(dto.getNickname());
         user.setRole(dto.getRole());
         user.setStatus("ENABLED");

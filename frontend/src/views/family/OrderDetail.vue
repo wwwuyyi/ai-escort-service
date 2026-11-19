@@ -31,7 +31,7 @@
         </div>
         <div class="info-item">
           <span class="label">预约时间</span>
-          <span class="value">{{ order.appointmentTime }}</span>
+          <span class="value">{{ formatDateTime(order.appointmentTime) }}</span>
         </div>
         <div class="info-item">
           <span class="label">服务时长</span>
@@ -43,9 +43,13 @@
         </div>
         <div class="info-item">
           <span class="label">支付状态</span>
-          <el-tag :type="order.payStatus === 'PAID' ? 'success' : 'warning'" size="large">
-            {{ order.payStatus === 'PAID' ? '已支付' : '未支付' }}
+          <el-tag :type="payStatusType" size="large">
+            {{ payStatusText }}
           </el-tag>
+        </div>
+        <div class="info-item" v-if="order.refundAmount != null">
+          <span class="label">退款金额</span>
+          <span class="value amount">¥{{ order.refundAmount }}</span>
         </div>
       </div>
     </div>
@@ -56,7 +60,7 @@
         <el-timeline-item
           v-for="log in statusLogs"
           :key="log.id"
-          :timestamp="log.createTime"
+          :timestamp="formatDateTime(log.createTime)"
           placement="top"
           :color="(log.toStatus || log.status) === 'CANCELLED' ? 'var(--danger)' : 'var(--teal-deep)'"
         >
@@ -135,6 +139,7 @@ import { ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import api from '@/api/request'
 import { getOrderStatusLabel, getOrderStatusType, getOrderStatusClass } from '@/utils/orderStatus'
+import { formatDateTime } from '@/utils/datetime'
 
 const route = useRoute()
 const order = ref(null)
@@ -147,6 +152,21 @@ const noticeId = ref(null)
 
 const getStatusType = (status) => getOrderStatusType(status)
 const getStatusLabel = (status) => getOrderStatusLabel(status)
+
+// REG-005：取消后需正确显示部分退款/已退款
+const payStatusText = computed(() => {
+  const map = {
+    PAID: '已支付',
+    REFUNDED: '已退款',
+    PARTIAL_REFUNDED: '部分退款',
+    UNPAID: '未支付'
+  }
+  return map[order.value?.payStatus] || '未支付'
+})
+const payStatusType = computed(() => {
+  const map = { PAID: 'success', REFUNDED: 'info', PARTIAL_REFUNDED: 'warning', UNPAID: 'info' }
+  return map[order.value?.payStatus] || 'info'
+})
 
 const canCancel = computed(() => {
   if (!order.value) return false

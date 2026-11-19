@@ -12,7 +12,7 @@
       <div class="info-grid">
         <div class="info-item">
           <span class="label">就诊人</span>
-          <span class="value">{{ desensitizedName(record.elderlyName) }}</span>
+          <span class="value">{{ record.elderlyName || '-' }}</span>
         </div>
         <div class="info-item">
           <span class="label">就诊日期</span>
@@ -45,17 +45,17 @@
         <div v-for="doc in documents" :key="doc.id" class="doc-item">
           <div class="doc-thumb">
             <el-image
-              v-if="doc.url"
-              :src="doc.url"
+              v-if="doc.displayUrl"
+              :src="doc.displayUrl"
               fit="cover"
               class="thumb-img"
-              :preview-src-list="[doc.url]"
+              :preview-src-list="[doc.displayUrl]"
               preview-teleported
             />
             <el-icon v-else :size="32"><Picture /></el-icon>
           </div>
           <div class="doc-info">
-            <span class="doc-name">{{ doc.name || '单据' }}</span>
+            <span class="doc-name">{{ docTypeLabel(doc.docType) }}</span>
             <el-tag :type="doc.ocrStatus === 'SUCCESS' ? 'success' : 'warning'" size="large">
               {{ doc.ocrStatus === 'SUCCESS' ? '已识别' : '识别中' }}
             </el-tag>
@@ -100,11 +100,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { ArrowLeft, Picture, WarningFilled } from '@element-plus/icons-vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft, ChatDotRound, Picture, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import api from '@/api/request'
-import { useRouter } from 'vue-router'
+import { signedFileUrl } from '@/utils/fileUrl'
+import { docTypeLabel } from '@/utils/docType'
 
 const route = useRoute()
 const router = useRouter()
@@ -112,13 +113,6 @@ const record = ref(null)
 const documents = ref([])
 const generating = ref(false)
 const explanationContent = ref('')
-
-const desensitizedName = (name) => {
-  if (!name) return '-'
-  if (name.length <= 1) return name
-  if (name.length === 2) return name.charAt(0) + '*'
-  return name.charAt(0) + '*'.repeat(name.length - 2) + name.charAt(name.length - 1)
-}
 
 const loadRecord = async () => {
   try {
@@ -135,7 +129,12 @@ const loadDocuments = async () => {
   try {
     const res = await api.get(`/record/${route.params.id}/documents`)
     if (res.code === 200 && res.data) {
-      documents.value = Array.isArray(res.data) ? res.data : (res.data.records || [])
+      const items = Array.isArray(res.data) ? res.data : (res.data.records || [])
+      // BUG-023：单据字段为 imageUrl/docType；图片通过短期签名 URL 展示
+      documents.value = await Promise.all(items.map(async doc => ({
+        ...doc,
+        displayUrl: doc.imageUrl ? await signedFileUrl(doc.imageUrl).catch(() => '') : ''
+      })))
     }
   } catch (e) {
     console.error('Failed to load documents:', e)

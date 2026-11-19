@@ -28,7 +28,7 @@
       </div>
       <div class="summary-item">
         <span class="label">预约时间</span>
-        <span class="value">{{ order.appointmentTime }}</span>
+        <span class="value">{{ formatDateTime(order.appointmentTime) }}</span>
       </div>
     </div>
 
@@ -76,6 +76,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import api from '@/api/request'
+import { formatDateTime } from '@/utils/datetime'
 
 const route = useRoute()
 const router = useRouter()

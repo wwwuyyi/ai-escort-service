@@ -66,7 +66,8 @@ public class AdminServiceImpl implements AdminService {
         return escortMapper.selectPage(new Page<>(current, size),
                 new LambdaQueryWrapper<EscortProfile>()
                         .eq(status != null && !status.isEmpty(), EscortProfile::getAuditStatus, status)
-                        .orderByAsc(EscortProfile::getCreateTime));
+                        .orderByAsc(EscortProfile::getCreateTime)
+                        .orderByAsc(EscortProfile::getId));
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
@@ -115,7 +116,7 @@ public class AdminServiceImpl implements AdminService {
         LambdaQueryWrapper<SysUser> w = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isEmpty())
             w.and(wr -> wr.like(SysUser::getUsername, keyword).or().like(SysUser::getNickname, keyword));
-        w.orderByDesc(SysUser::getCreateTime);
+        w.orderByDesc(SysUser::getCreateTime).orderByDesc(SysUser::getId);
         return userMapper.selectPage(new Page<>(current, size), w);
     }
 
@@ -124,7 +125,8 @@ public class AdminServiceImpl implements AdminService {
         if (!"ENABLED".equals(status) && !"DISABLED".equals(status))
             throw new BizException(ResultCode.BAD_REQUEST, "状态仅支持ENABLED或DISABLED");
         SysUser u = userMapper.selectById(userId);
-        if (u != null && "ADMIN".equals(u.getRole()) && "DISABLED".equals(status))
+        if (u == null) throw new BizException(ResultCode.NOT_FOUND, "用户不存在");
+        if ("ADMIN".equals(u.getRole()) && "DISABLED".equals(status))
             throw new BizException(ResultCode.BAD_REQUEST, "禁止禁用管理员账号");
         LambdaUpdateWrapper<SysUser> update = new LambdaUpdateWrapper<SysUser>()
                 .eq(SysUser::getId, userId).set(SysUser::getStatus, status);
@@ -159,7 +161,7 @@ public class AdminServiceImpl implements AdminService {
                 }
             });
         }
-        w.orderByDesc(EscortOrder::getCreateTime);
+        w.orderByDesc(EscortOrder::getCreateTime).orderByDesc(EscortOrder::getId);
         return orderMapper.selectPage(new Page<>(current, size), w).convert(this::toOrderVO);
     }
 
@@ -196,7 +198,9 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public IPage<Evaluation> evaluationPage(int current, int size) {
         return evalMapper.selectPage(new Page<>(current, size),
-                new LambdaQueryWrapper<Evaluation>().orderByDesc(Evaluation::getCreateTime));
+                new LambdaQueryWrapper<Evaluation>()
+                        .orderByDesc(Evaluation::getCreateTime)
+                        .orderByDesc(Evaluation::getId));
     }
 
     @Override @Transactional(rollbackFor = Exception.class)

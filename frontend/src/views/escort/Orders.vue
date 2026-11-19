@@ -44,7 +44,9 @@
         >
           <el-table-column prop="orderNo" label="订单编号" width="160" />
           <el-table-column prop="elderlyName" label="就诊人" width="110" />
-          <el-table-column prop="appointmentTime" label="预约时间" width="170" class-name="time-col" />
+          <el-table-column label="预约时间" width="170" class-name="time-col">
+            <template #default="{ row }">{{ formatDateTime(row.appointmentTime) }}</template>
+          </el-table-column>
           <el-table-column prop="department" label="就诊科室" width="120" />
           <el-table-column prop="hospitalName" label="就诊医院" min-width="150" show-overflow-tooltip />
           <el-table-column prop="amount" label="金额" width="90">

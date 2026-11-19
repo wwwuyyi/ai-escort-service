@@ -38,7 +38,7 @@
         <el-table-column prop="role" label="角色" width="120">
           <template #default="{ row }">
             <el-tag :class="row.role === 'ADMIN' ? 'status-tag status-tag--progress' : 'status-tag status-tag--neutral'">
-              {{ row.role === 'ADMIN' ? '管理员' : '普通用户' }}
+              {{ roleLabel(row.role) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -49,8 +49,12 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="phone" label="手机号" width="140" />
-        <el-table-column prop="createTime" label="注册时间" width="180" />
+        <el-table-column label="手机号" width="140">
+          <template #default="{ row }">{{ row.phone || row.username || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="注册时间" width="180">
+          <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
+        </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
             <el-button
@@ -94,6 +98,12 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, User } from '@element-plus/icons-vue'
 import api from '@/api/request'
+import { formatDateTime } from '@/utils/datetime'
+
+const ROLE_LABELS = { ADMIN: '管理员', FAMILY: '家属', ESCORT: '陪诊师' }
+function roleLabel(role) {
+  return ROLE_LABELS[role] || role || '未知角色'
+}
 
 const loading = ref(false)
 const records = ref([])

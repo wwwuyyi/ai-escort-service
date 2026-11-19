@@ -89,7 +89,8 @@ public class ElderlyProfileServiceImpl implements ElderlyProfileService {
         Page<ElderlyProfile> page = new Page<>(current, size);
         LambdaQueryWrapper<ElderlyProfile> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ElderlyProfile::getFamilyId, familyId)
-               .orderByDesc(ElderlyProfile::getCreateTime);
+               .orderByDesc(ElderlyProfile::getCreateTime)
+               .orderByDesc(ElderlyProfile::getId);
         IPage<ElderlyProfile> resultPage = elderlyProfileMapper.selectPage(page, wrapper);
         return resultPage.convert(this::toVO);
     }

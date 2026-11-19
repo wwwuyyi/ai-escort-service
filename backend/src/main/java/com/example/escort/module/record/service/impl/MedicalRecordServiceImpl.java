@@ -7,6 +7,8 @@ import com.example.escort.common.BizException;
 import com.example.escort.common.ResultCode;
 import com.example.escort.module.elderly.entity.ElderlyProfile;
 import com.example.escort.module.elderly.mapper.ElderlyProfileMapper;
+import com.example.escort.module.hospital.entity.Hospital;
+import com.example.escort.module.hospital.mapper.HospitalMapper;
 import com.example.escort.module.order.entity.EscortOrder;
 import com.example.escort.module.order.mapper.EscortOrderMapper;
 import com.example.escort.module.record.dto.MedicalRecordDTO;
@@ -34,6 +36,7 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
     private final MedicalDocumentMapper documentMapper;
     private final ElderlyProfileMapper elderlyMapper;
     private final EscortOrderMapper orderMapper;
+    private final HospitalMapper hospitalMapper;
 
     // ========== 档案CRUD（FAMILY） ==========
 
@@ -86,7 +89,7 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
             w.in(MedicalRecord::getElderlyId, ids);
         }
         if (elderlyId != null) w.eq(MedicalRecord::getElderlyId, elderlyId);
-        w.orderByDesc(MedicalRecord::getVisitDate);
+        w.orderByDesc(MedicalRecord::getVisitDate).orderByDesc(MedicalRecord::getId);
         return recordMapper.selectPage(page, w).convert(this::toVO);
     }
 
@@ -149,14 +152,29 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
         if (!"IN_SERVICE".equals(order.getStatus()))
             throw new BizException(ResultCode.CONFLICT, "仅可在服务中的订单下创建就医档案");
 
-        MedicalRecord r = new MedicalRecord();
-        r.setElderlyId(order.getElderlyId());
-        r.setOrderId(order.getId());
-        r.setHospitalId(order.getHospitalId());
-        r.setDepartment(order.getDepartment());
-        r.setVisitDate(order.getAppointmentTime() != null
-                ? order.getAppointmentTime().toLocalDate() : java.time.LocalDate.now());
-        recordMapper.insert(r);
+        // REG-006：同一订单复用已有档案；同一档案+同一图片+同一类型复用已有单据，避免重复点击重复建档
+        MedicalRecord r = recordMapper.selectOne(new LambdaQueryWrapper<MedicalRecord>()
+                .eq(MedicalRecord::getOrderId, order.getId())
+                .orderByDesc(MedicalRecord::getId)
+                .last("LIMIT 1"));
+        if (r == null) {
+            r = new MedicalRecord();
+            r.setElderlyId(order.getElderlyId());
+            r.setOrderId(order.getId());
+            r.setHospitalId(order.getHospitalId());
+            r.setDepartment(order.getDepartment());
+            r.setVisitDate(order.getAppointmentTime() != null
+                    ? order.getAppointmentTime().toLocalDate() : java.time.LocalDate.now());
+            recordMapper.insert(r);
+        }
+
+        MedicalDocument existing = documentMapper.selectOne(new LambdaQueryWrapper<MedicalDocument>()
+                .eq(MedicalDocument::getRecordId, r.getId())
+                .eq(MedicalDocument::getImageUrl, imageUrl)
+                .eq(MedicalDocument::getDocType, docType)
+                .orderByDesc(MedicalDocument::getId)
+                .last("LIMIT 1"));
+        if (existing != null) return toDocVO(existing);
 
         MedicalDocument d = new MedicalDocument();
         d.setRecordId(r.getId());
@@ -232,6 +250,15 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
         if (e != null) {
             vo.setElderlyName(e.getName());
             vo.setPhone(e.getPhone());
+        }
+        // BUG-022：补齐医院名称与关联订单号
+        if (r.getHospitalId() != null) {
+            Hospital h = hospitalMapper.selectById(r.getHospitalId());
+            if (h != null) vo.setHospitalName(h.getName());
+        }
+        if (r.getOrderId() != null) {
+            EscortOrder order = orderMapper.selectById(r.getOrderId());
+            if (order != null) vo.setOrderNo(order.getOrderNo());
         }
         vo.setDocuments(documentMapper.selectList(new LambdaQueryWrapper<MedicalDocument>()
                 .eq(MedicalDocument::getRecordId, r.getId()))

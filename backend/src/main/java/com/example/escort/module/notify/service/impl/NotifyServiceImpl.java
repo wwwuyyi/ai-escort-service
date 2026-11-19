@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.example.escort.common.BizException;
+import com.example.escort.common.ResultCode;
 import com.example.escort.module.notify.entity.SysNotification;
 import com.example.escort.module.notify.mapper.SysNotificationMapper;
 import com.example.escort.module.notify.service.NotifyService;
@@ -21,14 +23,21 @@ public class NotifyServiceImpl implements NotifyService {
         Page<SysNotification> p = new Page<>(current, size);
         return notifyMapper.selectPage(p, new LambdaQueryWrapper<SysNotification>()
                 .eq(SysNotification::getRecipientId, userId)
-                .orderByDesc(SysNotification::getCreateTime));
+                .orderByDesc(SysNotification::getCreateTime)
+                .orderByDesc(SysNotification::getId));
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
     public void markRead(Long userId, Long id) {
-        notifyMapper.update(null, new LambdaUpdateWrapper<SysNotification>()
-                .eq(SysNotification::getId, id).eq(SysNotification::getRecipientId, userId)
-                .set(SysNotification::getIsRead, 1).set(SysNotification::getReadTime, LocalDateTime.now()));
+        SysNotification n = notifyMapper.selectById(id);
+        if (n == null || !n.getRecipientId().equals(userId)) {
+            throw new BizException(ResultCode.NOT_FOUND, "通知不存在");
+        }
+        if (n.getIsRead() == null || n.getIsRead() == 0) {
+            notifyMapper.update(null, new LambdaUpdateWrapper<SysNotification>()
+                    .eq(SysNotification::getId, id).eq(SysNotification::getRecipientId, userId)
+                    .set(SysNotification::getIsRead, 1).set(SysNotification::getReadTime, LocalDateTime.now()));
+        }
     }
 
     @Override @Transactional(rollbackFor = Exception.class)

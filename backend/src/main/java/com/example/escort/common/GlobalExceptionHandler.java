@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -91,6 +92,16 @@ public class GlobalExceptionHandler {
     public Result<Void> handleDataIntegrity(DataIntegrityViolationException e) {
         log.warn("数据完整性校验失败: {}", e.getMostSpecificCause().getMessage());
         return Result.fail(ResultCode.BAD_REQUEST.getCode(), "提交的数据不合法或超出长度限制");
+    }
+
+    /**
+     * 上传文件超过 multipart 限制（BUG-021）
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+    public Result<Void> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+        log.warn("上传文件超过大小限制: {}", e.getMessage());
+        return Result.fail(413, "文件过大，最大支持10MB");
     }
 
     /**

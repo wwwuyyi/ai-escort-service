@@ -95,7 +95,7 @@
                 <em>{{ order.orderNo }}</em>
               </span>
               <span class="order-dept">{{ order.department || '—' }}</span>
-              <span class="order-time">{{ order.appointmentTime }}</span>
+              <span class="order-time">{{ formatDateTime(order.appointmentTime) }}</span>
               <el-tag :type="getStatusType(order.status)" :class="getOrderStatusClass(order.status)">
                 {{ getStatusLabel(order.status) }}
               </el-tag>
@@ -191,6 +191,7 @@ import { useUserStore } from '@/store/user'
 import api from '@/api/request'
 import FamilyTopNav from '@/components/FamilyTopNav.vue'
 import { getOrderStatusLabel, getOrderStatusType, getOrderStatusClass } from '@/utils/orderStatus'
+import { formatDateTime } from '@/utils/datetime'
 
 const userStore = useUserStore()
 const notificationCount = ref(0)

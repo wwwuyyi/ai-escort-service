@@ -140,7 +140,7 @@ public class OrderServiceImpl implements OrderService {
         if ("FAMILY".equals(role)) w.eq(EscortOrder::getFamilyId, userId);
         else if ("ESCORT".equals(role)) w.eq(EscortOrder::getEscortId, userId);
         if (status != null && !status.isEmpty()) w.eq(EscortOrder::getStatus, status);
-        w.orderByDesc(EscortOrder::getCreateTime);
+        w.orderByDesc(EscortOrder::getCreateTime).orderByDesc(EscortOrder::getId);
         return orderMapper.selectPage(page, w).convert(this::toVO);
     }
 

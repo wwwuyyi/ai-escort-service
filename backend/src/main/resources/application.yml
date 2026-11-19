@@ -42,6 +42,15 @@ jwt:
   secret: ${JWT_SECRET:}
   expiration: 7200  # 2小时，单位秒
 
+# 文件短期签名 URL 有效期（秒）
+file:
+  sign-ttl-seconds: 300
+
+# 接口文档默认关闭（生产/演示）；本地需要时设置 API_DOCS_ENABLED=true
+app:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+
 # AI服务配置（占位符，以主流公开API为例，具体实现需参考对应官方文档）
 ai:
   ocr:

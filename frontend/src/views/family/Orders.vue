@@ -56,7 +56,7 @@
               <em>{{ order.orderNo }}</em>
             </span>
             <span class="order-dept">{{ order.department || '—' }}</span>
-            <span class="order-time">{{ order.appointmentTime }}</span>
+            <span class="order-time">{{ formatDateTime(order.appointmentTime) }}</span>
             <span class="order-amount">{{ order.amount ? `¥${order.amount}` : '—' }}</span>
             <el-tag :type="getStatusType(order.status)" :class="getOrderStatusClass(order.status)">
               {{ getStatusLabel(order.status) }}
@@ -95,6 +95,7 @@ import { ArrowLeft, Document, Plus } from '@element-plus/icons-vue'
 import api from '@/api/request'
 import FamilyTopNav from '@/components/FamilyTopNav.vue'
 import { getOrderStatusLabel, getOrderStatusType, getOrderStatusClass } from '@/utils/orderStatus'
+import { formatDateTime } from '@/utils/datetime'
 
 const activeStatus = ref('all')
 const orders = ref([])

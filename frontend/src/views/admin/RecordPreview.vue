@@ -73,7 +73,7 @@
           </el-descriptions-item>
           <el-descriptions-item label="处方信息" :span="2">{{ currentRecord.prescription || '-' }}</el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ currentRecord.remark || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="创建时间">{{ currentRecord.createTime }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间">{{ formatDateTime(currentRecord.createTime) }}</el-descriptions-item>
         </el-descriptions>
 
         <div v-if="documents.length > 0" class="documents-section">
@@ -82,17 +82,17 @@
             <div v-for="doc in documents" :key="doc.id" class="doc-item">
               <div class="doc-thumb">
                 <el-image
-                  v-if="doc.url"
-                  :src="doc.url"
+                  v-if="doc.displayUrl"
+                  :src="doc.displayUrl"
                   fit="cover"
                   style="width:80px;height:80px;border-radius:8px"
-                  :preview-src-list="[doc.url]"
+                  :preview-src-list="[doc.displayUrl]"
                   preview-teleported
                 />
                 <el-icon v-else :size="32"><Picture /></el-icon>
               </div>
               <div class="doc-info">
-                <span class="doc-name">{{ doc.name || '单据' }}</span>
+                <span class="doc-name">{{ docTypeLabel(doc.docType) }}</span>
                 <el-tag :class="doc.ocrStatus === 'SUCCESS' ? 'status-tag status-tag--done' : 'status-tag status-tag--pending'" size="small">
                   {{ doc.ocrStatus === 'SUCCESS' ? '已识别' : doc.ocrStatus === 'RUNNING' ? '识别中' : '未识别' }}
                 </el-tag>
@@ -116,6 +116,9 @@ import { ref, onMounted } from 'vue'
 import { ArrowLeft, Picture, View } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import api from '@/api/request'
+import { signedFileUrl } from '@/utils/fileUrl'
+import { docTypeLabel } from '@/utils/docType'
+import { formatDateTime } from '@/utils/datetime'
 
 const loading = ref(false)
 const records = ref([])
@@ -153,7 +156,11 @@ async function showDetail(row) {
     if (detailRes.data) {
       currentRecord.value = detailRes.data
     }
-    documents.value = Array.isArray(docRes.data) ? docRes.data : (docRes.data?.records || [])
+    const items = Array.isArray(docRes.data) ? docRes.data : (docRes.data?.records || [])
+    documents.value = await Promise.all(items.map(async doc => ({
+      ...doc,
+      displayUrl: doc.imageUrl ? await signedFileUrl(doc.imageUrl).catch(() => '') : ''
+    })))
   } catch (e) {
     ElMessage.error('加载档案详情失败')
   }

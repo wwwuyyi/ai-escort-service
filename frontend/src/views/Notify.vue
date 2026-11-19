@@ -39,7 +39,7 @@
             <el-tag v-if="!n.isRead" type="warning" size="small">未读</el-tag>
           </div>
           <p>{{ n.content }}</p>
-          <time>{{ n.createTime }}</time>
+          <time>{{ formatDateTime(n.createTime) }}</time>
         </div>
         <el-icon class="notify-arrow" :size="16"><ArrowRight /></el-icon>
       </article>
@@ -62,6 +62,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Bell, ArrowRight } from '@element-plus/icons-vue'
 import api from '@/api/request'
+import { formatDateTime } from '@/utils/datetime'
 
 const list = ref([])
 const current = ref(1)

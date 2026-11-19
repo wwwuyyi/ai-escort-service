@@ -35,7 +35,9 @@
         </el-table-column>
         <el-table-column prop="phone" label="联系电话" width="140" />
         <el-table-column prop="intro" label="个人介绍" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="createTime" label="提交时间" width="180" />
+        <el-table-column label="提交时间" width="180">
+          <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
+        </el-table-column>
         <template #empty>
           <div class="empty-block">
             <span class="empty-icon"><el-icon :size="24"><Checked /></el-icon></span>
@@ -60,7 +62,8 @@
     </div>
 
     <!-- Detail Dialog -->
-    <el-dialog v-model="dialogVisible" title="审核详情" width="600px" destroy-on-close v-loading="detailLoading">
+    <el-dialog v-model="dialogVisible" title="审核详情" width="600px" destroy-on-close>
+      <div v-loading="detailLoading" class="audit-detail-body">
       <template v-if="currentItem">
         <el-descriptions :column="1" border>
           <el-descriptions-item label="真实姓名">{{ currentItem.realName }}</el-descriptions-item>
@@ -113,6 +116,7 @@
           />
         </div>
       </template>
+      </div>
 
       <template #footer>
         <div class="dialog-footer" v-if="currentItem?.auditStatus === 'PENDING'">
@@ -143,7 +147,8 @@ import { ElMessage } from 'element-plus'
 import { Checked } from '@element-plus/icons-vue'
 import api from '@/api/request'
 import { getAuditStatusClass, getAuditStatusLabel } from '@/utils/auditStatus'
-import { fileUrl } from '@/utils/fileUrl'
+import { signedFileUrl } from '@/utils/fileUrl'
+import { formatDateTime } from '@/utils/datetime'
 
 const loading = ref(false)
 const auditing = ref(false)
@@ -169,9 +174,13 @@ function parseMaterials(materials) {
   return String(materials).split(',').map(s => s.trim()).filter(Boolean)
 }
 
-const materialUrls = computed(() =>
-  parseMaterials(currentItem.value?.materials).map(fileUrl)
-)
+const materialUrls = ref([])
+
+async function resolveMaterials(materials) {
+  const paths = parseMaterials(materials)
+  const urls = await Promise.all(paths.map(p => signedFileUrl(p).catch(() => '')))
+  materialUrls.value = urls.filter(Boolean)
+}
 
 async function fetchData() {
   loading.value = true
@@ -190,6 +199,7 @@ async function fetchData() {
 
 async function showDetail(row) {
   currentItem.value = row
+  materialUrls.value = []
   showRejectInput.value = false
   rejectRemark.value = ''
   dialogVisible.value = true
@@ -198,6 +208,7 @@ async function showDetail(row) {
   try {
     const res = await api.get(`/admin/escort/audit/${row.userId || row.id}/detail`)
     if (res.data) currentItem.value = res.data
+    await resolveMaterials(currentItem.value?.materials)
   } catch (e) {
     ElMessage.error('加载审核详情失败')
   } finally {
@@ -305,6 +316,9 @@ onMounted(() => {
   background: var(--surface-3);
   color: var(--muted-2);
   font-size: 12px;
+}
+.audit-detail-body {
+  min-height: 160px;
 }
 .reject-section {
   margin-top: 16px;
