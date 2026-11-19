@@ -80,13 +80,17 @@ set AES_KEY=你的AES密钥（至少16字节）
 
 > **AES_KEY 迁移注意**：prod 会拒绝 demo 默认 AES 密钥。若从 demo 数据迁移，必须使用加密现有数据时所用的 AES 密钥，或先完成敏感字段重加密，否则身份证号/地址等历史密文无法解密。
 
-### 4. 配置 AI Key（可选）
+### 4. 配置 AI Key（使用真实 AI 必填）
 
 ```bat
 setx AI_API_KEY "sk-xxxxxxxxxxxxxxxx"
+setx AI_CHAT_MODEL "deepseek-flash"
 ```
 
-设置后需**新开终端**才生效。未设置 Key 时，系统自动使用本地 Mock，可完成全部 AI 流程演示。
+- 设置后需**新开终端/注销重登**才生效，再双击 `start.bat`。
+- 启动窗口显示 `[AI] 已检测到 AI_API_KEY，使用 DeepSeek 真实 API` 才代表生效。
+- 账号需有余额，否则接口返回 402 并自动降级 Mock。
+- 未设置 Key 时，系统自动使用本地 Mock，可完成全部 AI 流程演示（非真实 AI）。
 
 ### 5. 一键启动（demo profile）
 
@@ -166,10 +170,10 @@ java -jar target/escort-1.0.0-SNAPSHOT.jar
 
 ## 七、AI 调用与降级策略
 
-- 默认调用 DeepSeek（`deepseek-reasoner`，前端显示可折叠思考过程）。
+- 默认调用 DeepSeek（`deepseek-flash`；如需思考过程可设置 `AI_CHAT_MODEL=deepseek-reasoner`，需账号支持）。
 - 调用失败会按 1s/2s/4s 退避重试；连续失败达到阈值后进入熔断，自动切换到本地 Mock（`http://localhost:9002/llm`）。
 - Mock 也不可用时才返回降级提示，不影响非 AI 业务演示。
-- 关闭思考过程：设置 `AI_CHAT_MODEL=deepseek-chat` 后重启后端。
+- 切换模型：设置 `AI_CHAT_MODEL`（如 `deepseek-flash` / `deepseek-v4-pro`）后重启后端。
 
 ## 八、常见问题
 

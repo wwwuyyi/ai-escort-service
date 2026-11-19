@@ -75,8 +75,8 @@ ai:
     # 主模型不可用/熔断时自动切换本地Mock兜底（需先启动 mock-ai-server）
     fallback-base-url: ${AI_LLM_FALLBACK_BASE_URL:http://localhost:9002/llm}
     fallback-api-key: ${AI_LLM_FALLBACK_API_KEY:demo-api-key}
-    # AI对话模型：deepseek-reasoner 返回思考过程；改为 deepseek-chat 则只返回正文
-    chat-model: ${AI_CHAT_MODEL:deepseek-reasoner}
+    # AI对话模型：默认 deepseek-flash（当前账号可用）；如需思考过程可设置 AI_CHAT_MODEL=deepseek-reasoner
+    chat-model: ${AI_CHAT_MODEL:deepseek-flash}
   connect-timeout-ms: 3000
   max-retry: 3
   retry-backoff-ms: 1000          # 指数倍乘：1s/2s/4s

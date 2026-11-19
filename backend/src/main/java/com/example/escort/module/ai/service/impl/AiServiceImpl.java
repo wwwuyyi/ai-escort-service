@@ -316,7 +316,7 @@ public class AiServiceImpl implements AiService {
         messages.add(new JSONObject().set("role", "system").set("content", GEN_SYSTEM_PROMPT));
         messages.add(new JSONObject().set("role", "user").set("content", prompt));
         JSONObject req = new JSONObject();
-        req.set("model", "deepseek-chat");
+        req.set("model", aiProps.getLlm().getChatModel());
         req.set("messages", messages);
         String respJson = httpClient.llmPost("/chat/completions", req.toString());
         JSONObject respObj = JSONUtil.parseObj(respJson);

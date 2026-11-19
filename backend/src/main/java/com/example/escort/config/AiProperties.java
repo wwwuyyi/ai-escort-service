@@ -58,7 +58,7 @@ public class AiProperties {
         /** 兜底LLM密钥 */
         private String fallbackApiKey = "demo-api-key";
 
-        /** AI对话使用的模型：deepseek-reasoner可返回思考过程，deepseek-chat不返回 */
-        private String chatModel = "deepseek-reasoner";
+        /** AI对话使用的模型：默认 deepseek-flash（账号可用模型）；如需思考过程可设置 AI_CHAT_MODEL=deepseek-reasoner */
+        private String chatModel = "deepseek-flash";
     }
 }
