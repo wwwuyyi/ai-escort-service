@@ -48,14 +48,13 @@
 mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS escort_db DEFAULT CHARACTER SET utf8mb4;"
 mysql -uroot -proot escort_db < sql/01-schema.sql
 mysql -uroot -proot escort_db < sql/02-init-data.sql
-mysql -uroot -proot escort_db < sql/03-alter-order-request-id.sql
 mysql -uroot -proot escort_db < sql/04-add-chat-tables.sql
 mysql -uroot -proot escort_db < sql/05-fix-gender-width.sql
 mysql -uroot -proot escort_db < sql/06-security-token-version-and-request-id-scope.sql
 mysql -uroot -proot escort_db < sql/07-add-order-remark.sql
 ```
 
-> 空库按 01→07 全量执行；已有旧库按 05→06→07 顺序补跑。06 增加 `token_version` 与订单 `(family_id, request_id)` 唯一键，07 确保 `escort_order.remark` 存在；06/07 均可重复执行。
+> **全新库执行顺序：01→02→04→05→06→07。** `01-schema.sql` 已包含 `request_id`，因此全新库不要再执行 `03-alter-order-request-id.sql`（它是早期旧库升级脚本，会提示重复列）。旧库升级如缺 `request_id` 才执行 03，再补跑 05→06→07。06 增加 `token_version` 与订单 `(family_id, request_id)` 唯一键，07 确保 `escort_order.remark` 存在；06/07 均可重复执行。
 
 ### 2. 配置 JWT_SECRET（必填）
 
