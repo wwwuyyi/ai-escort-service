@@ -12,6 +12,7 @@ import java.time.LocalDate;
 public class MedicalRecordDTO {
     @NotNull(message = "老人档案ID不能为空")
     private Long elderlyId;
+    /** 关联订单（可选）；创建时会校验归属与老人一致性 */
     private Long orderId;
     @NotNull(message = "医院ID不能为空")
     private Long hospitalId;

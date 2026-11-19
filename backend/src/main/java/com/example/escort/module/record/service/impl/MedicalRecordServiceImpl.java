@@ -47,6 +47,15 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
         ElderlyProfile e = elderlyMapper.selectById(dto.getElderlyId());
         if (e == null || !e.getFamilyId().equals(userId))
             throw new BizException(ResultCode.BAD_REQUEST, "老人档案不属于您");
+        // BUG-032：关联订单必须存在、属于当前家属，且与就诊老人一致
+        if (dto.getOrderId() != null) {
+            EscortOrder order = orderMapper.selectById(dto.getOrderId());
+            if (order == null) throw new BizException(ResultCode.BAD_REQUEST, "关联订单不存在");
+            if (!order.getFamilyId().equals(userId))
+                throw new BizException(ResultCode.FORBIDDEN, "关联订单不属于您");
+            if (!order.getElderlyId().equals(dto.getElderlyId()))
+                throw new BizException(ResultCode.BAD_REQUEST, "关联订单与就诊老人不一致");
+        }
         MedicalRecord r = buildEntity(dto);
         recordMapper.insert(r);
         return toVO(r);

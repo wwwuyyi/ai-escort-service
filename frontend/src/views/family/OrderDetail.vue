@@ -51,6 +51,10 @@
           <span class="label">退款金额</span>
           <span class="value amount">¥{{ order.refundAmount }}</span>
         </div>
+        <div class="info-item" v-if="order.remark">
+          <span class="label">特殊备注</span>
+          <span class="value">{{ order.remark }}</span>
+        </div>
       </div>
     </div>
 

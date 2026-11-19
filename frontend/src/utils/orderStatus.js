@@ -4,14 +4,18 @@
  */
 export const ORDER_STATUS_MAP = {
   PENDING_DISPATCH: { label: '待派单', type: 'warning' },
-  DISPATCHED: { label: '已派单', type: 'info' },
-  ACCEPTED: { label: '已接单', type: 'primary' },
+  DISPATCHED: { label: '已派单待接单', type: 'info' },
+  ACCEPTED: { label: '已接单待服务', type: 'primary' },
   IN_SERVICE: { label: '服务中', type: 'primary' },
-  SERVICE_FINISHED: { label: '服务完成', type: 'success' },
-  SETTLED: { label: '待结算', type: 'warning' },
+  SERVICE_FINISHED: { label: '服务结束待结算', type: 'success' },
+  SETTLED: { label: '已结算待评价', type: 'warning' },
   COMPLETED: { label: '已完成', type: 'success' },
   CANCELLED: { label: '已取消', type: 'info' }
 }
+
+/** 与 OrderStatus 枚举一一对应的筛选选项 */
+export const ORDER_STATUS_OPTIONS = Object.entries(ORDER_STATUS_MAP)
+  .map(([value, meta]) => ({ value, label: meta.label }))
 
 export function getOrderStatus(status) {
   return ORDER_STATUS_MAP[status] || { label: status || '未知状态', type: 'info' }

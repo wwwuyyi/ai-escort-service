@@ -26,5 +26,6 @@ public class OrderVO {
     private String payStatus;
     private BigDecimal refundAmount;
     private String cancelReason;
+    private String remark;
     private LocalDateTime createTime;
 }

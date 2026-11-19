@@ -61,4 +61,9 @@ public class AdminController {
     @Operation(summary = "违规评价隐藏") @PutMapping("/evaluation/{id}/hide")
     public Result<Void> hideEvaluation(@PathVariable Long id, @RequestParam(required = false) String reason) {
         adminService.hideEvaluation(id, reason); return Result.ok(); }
+
+    @Operation(summary = "取消隐藏评价")
+    @PutMapping("/evaluation/{id}/unhide")
+    public Result<Void> unhideEvaluation(@PathVariable Long id) {
+        adminService.unhideEvaluation(id); return Result.ok(); }
 }

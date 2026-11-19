@@ -81,6 +81,17 @@
             placeholder="请输入服务时长"
           />
         </el-form-item>
+
+        <el-form-item label="特殊备注">
+          <el-input
+            v-model="orderForm.remark"
+            type="textarea"
+            :rows="2"
+            maxlength="500"
+            show-word-limit
+            placeholder="如：需轮椅、家属陪同、行动不便等（选填）"
+          />
+        </el-form-item>
       </el-form>
 
       <div class="estimate-box" v-if="estimatedAmount !== null">
@@ -188,7 +199,8 @@ const orderForm = ref({
   department: '',
   serviceType: '',
   appointmentTime: '',
-  duration: 1
+  duration: 1,
+  remark: ''
 })
 
 const rules = {
@@ -268,7 +280,8 @@ const handleSubmit = async () => {
       serviceType: orderForm.value.serviceType,
       appointmentTime: orderForm.value.appointmentTime,
       duration: orderForm.value.duration,
-      amount: estimatedAmount.value
+      amount: estimatedAmount.value,
+      remark: orderForm.value.remark || null
     })
     if (res.code === 200) {
       ElMessage.success('下单成功')
@@ -287,7 +300,7 @@ onMounted(async () => {
   try {
     const hRes = await api.get('/hospital/list')
     if (hRes.data) hospitals.value = hRes.data
-    const res = await api.get('/elderly/page')
+    const res = await api.get('/elderly/page', { params: { current: 1, size: 1000 } })
     if (res.code === 200 && res.data) {
       elderlyList.value = res.data.records || []
     }

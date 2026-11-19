@@ -23,7 +23,7 @@
 │   └── vite.config.js
 ├── ai-service/         Mock AI Server（OCR :9001 + LLM :9002）
 │   └── server.js
-├── sql/                数据库脚本（按 01→05 顺序执行）
+├── sql/                数据库脚本（按 01→07 顺序执行）
 ├── start.bat           Windows 一键启动
 ├── README.md
 └── .gitignore
@@ -51,25 +51,37 @@ mysql -uroot -proot escort_db < sql/02-init-data.sql
 mysql -uroot -proot escort_db < sql/03-alter-order-request-id.sql
 mysql -uroot -proot escort_db < sql/04-add-chat-tables.sql
 mysql -uroot -proot escort_db < sql/05-fix-gender-width.sql
+mysql -uroot -proot escort_db < sql/06-security-token-version-and-request-id-scope.sql
+mysql -uroot -proot escort_db < sql/07-add-order-remark.sql
 ```
 
-> 空库按 01→05 全量执行；已有旧库升级至少补跑 `05-fix-gender-width.sql`，否则女性用户数据写入会报 500。
+> 空库按 01→07 全量执行；已有旧库按 05→06→07 顺序补跑。06 增加 `token_version` 与订单 `(family_id, request_id)` 唯一键，07 确保 `escort_order.remark` 存在；06/07 均可重复执行。
 
-### 2. 配置数据库密码（通常不用改）
+### 2. 配置 JWT_SECRET（必填）
 
-默认读取 `root/root`，如需修改，编辑：
-
-```text
-backend/src/main/resources/application.yml
-```
-
-或设置环境变量：
+后端启动时强制校验 `JWT_SECRET`：未配置、仍为旧默认值或长度小于 32 字节会拒绝启动。
 
 ```bat
-setx DB_PASSWORD "你的MySQL密码"
+set JWT_SECRET=请替换为至少32字节的随机字符串
 ```
 
-### 3. 配置 AI Key（可选）
+`start.bat` 在未设置时会自动生成本次运行专用的随机密钥（重启后旧 Token 失效），仅适合本机演示。
+生产环境必须通过环境变量或密钥管理系统注入，不能使用仓库内或启动脚本生成的临时值。
+
+### 3. 配置数据库（演示默认 root/root）
+
+demo 环境默认读取 `root/root`；生产环境使用 prod profile 并注入非默认口令：
+
+```bat
+set SPRING_PROFILES_ACTIVE=prod
+set DB_USERNAME=你的最小权限账号
+set DB_PASSWORD=你的非默认数据库口令
+set AES_KEY=你的AES密钥（至少16字节）
+```
+
+> **AES_KEY 迁移注意**：prod 会拒绝 demo 默认 AES 密钥。若从 demo 数据迁移，必须使用加密现有数据时所用的 AES 密钥，或先完成敏感字段重加密，否则身份证号/地址等历史密文无法解密。
+
+### 4. 配置 AI Key（可选）
 
 ```bat
 setx AI_API_KEY "sk-xxxxxxxxxxxxxxxx"
@@ -77,7 +89,7 @@ setx AI_API_KEY "sk-xxxxxxxxxxxxxxxx"
 
 设置后需**新开终端**才生效。未设置 Key 时，系统自动使用本地 Mock，可完成全部 AI 流程演示。
 
-### 4. 一键启动
+### 5. 一键启动（demo profile）
 
 双击 `start.bat`，脚本依次完成：
 
@@ -86,15 +98,17 @@ setx AI_API_KEY "sk-xxxxxxxxxxxxxxxx"
 3. 启动后端（8080）
 4. 启动前端（5173）并打开浏览器
 
-### 5. 手动启动（三个终端）
+### 6. 手动启动（三个终端）
 
 ```bat
 REM 终端 1：Mock AI
 cd ai-service
 node server.js
 
-REM 终端 2：后端
+REM 终端 2：后端（demo profile + JWT 密钥）
 cd backend
+set SPRING_PROFILES_ACTIVE=demo
+set JWT_SECRET=请替换为至少32字节的随机字符串
 mvn spring-boot:run
 
 REM 终端 3：前端
@@ -105,7 +119,7 @@ npm run dev
 
 访问 <http://localhost:5173>。
 
-### 6. 纯离线演示（不调用真实 API）
+### 7. 纯离线演示（不调用真实 API）
 
 先启动 Mock，再启动后端并覆盖 AI 地址：
 
@@ -113,6 +127,24 @@ npm run dev
 cd backend
 mvn spring-boot:run -Dspring-boot.run.arguments="--ai.llm.base-url=http://localhost:9002/llm --ai.ocr.base-url=http://localhost:9001/ocr --ai.api-key=demo-api-key"
 ```
+
+### 8. 生产部署（prod profile）
+
+```bat
+cd backend
+set SPRING_PROFILES_ACTIVE=prod
+set JWT_SECRET=至少32字节随机密钥
+set AES_KEY=至少16字节的生产AES密钥
+set DB_USERNAME=最小权限数据库账号
+set DB_PASSWORD=非默认数据库口令
+java -jar target/escort-1.0.0-SNAPSHOT.jar
+```
+
+- prod 会拒绝启动：未注入 `JWT_SECRET`、`AES_KEY`、`DB_PASSWORD`，或 `DB_PASSWORD=root`、`AES_KEY=escort-aes-key-2026-demo`、JWT 仍为默认/过短。
+- **AES_KEY 必须与库中已有密文匹配**；更换密钥前需先重加密 `elderly_profile.id_card/address`、`escort_profile.id_card` 等敏感字段。
+- 接口文档默认关闭（`/doc.html`、`/v3/api-docs` → 404）；本地调试可设置 `API_DOCS_ENABLED=true`。
+- 登录限流默认：同一 IP+账号 5 分钟内连续失败 5 次锁定 15 分钟；可通过 `security.login.max-failures/window-minutes/lock-minutes` 调整。部署在反向代理后时，必须把代理出口 IP 配置到 `security.login.trusted-proxies`（环境变量 `LOGIN_TRUSTED_PROXIES`），否则不会信任 `X-Forwarded-For`。
+- 所有响应带 `X-Content-Type-Options/X-Frame-Options/Referrer-Policy/Permissions-Policy/CSP` 安全头。
 
 ## 五、测试账号
 
@@ -164,5 +196,7 @@ mvn spring-boot:run -Dspring-boot.run.arguments="--ai.llm.base-url=http://localh
 
 - 后端按 `module/<业务域>/{controller,service,mapper,entity,dto,vo}` 分层。
 - 前端接口统一走 `/api`，Vite 代理到 `localhost:8080`。
-- 上传文件统一存放 `backend/upload/`，通过 `/upload/**` 访问。
-- 数据库脚本只增不改；旧库升级新增独立脚本编号。
+- 上传文件统一存放 `backend/upload/`；前端通过 `/api/file/signed-url` 获取 5 分钟短期签名 URL，再由 `/api/file/download` 加载，URL 中不携带登录 JWT。`/upload/**` 直链仍需登录并按业务归属授权。
+- 上传内容必须同时通过扩展名、文件头魔数和图片解码校验；允许 jpg/jpeg/png/gif/bmp/pdf，最大 10MB。
+- AI 生成的 HTML 在前端统一经 DOMPurify 白名单消毒后再渲染。
+- 数据库脚本只增不改；旧库升级新增独立脚本编号（当前至 `07-add-order-remark.sql`）。

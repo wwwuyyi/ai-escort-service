@@ -181,7 +181,8 @@ public class AiChatServiceImpl implements AiChatService {
             messageMapper.insert(userMsg);
 
             // 3. 构建对话上下文（system + 最近N轮历史 + 当前消息）
-            List<JSONObject> messages = buildMessagesList(session.getId(), dto.getMessage());
+            // BUG-037：刚保存的当前消息需要从历史中排除，避免重复发送
+            List<JSONObject> messages = buildMessagesList(session.getId(), dto.getMessage(), userMsg.getId());
 
             // 4. 发送初始事件通知前端会话ID
             emitter.send(SseEmitter.event().data("{\"sessionId\":" + session.getId() + "}"));
@@ -317,7 +318,7 @@ public class AiChatServiceImpl implements AiChatService {
     /**
      * 构建LLM请求的消息列表（system + 最近历史 + 当前消息）
      */
-    private List<JSONObject> buildMessagesList(Long sessionId, String currentMessage) {
+    private List<JSONObject> buildMessagesList(Long sessionId, String currentMessage, Long currentMessageId) {
         List<JSONObject> messages = new ArrayList<>();
 
         // 获取会话的system prompt
@@ -329,11 +330,13 @@ public class AiChatServiceImpl implements AiChatService {
             messages.add(sysMsg);
         }
 
-        // 获取最近N轮历史消息（不含SYSTEM）
+        // 获取最近N轮历史消息（不含SYSTEM，且排除刚落库的当前消息）
         LambdaQueryWrapper<AiChatMessage> wrapper = new LambdaQueryWrapper<AiChatMessage>()
                 .eq(AiChatMessage::getSessionId, sessionId)
                 .ne(AiChatMessage::getRole, "SYSTEM")
+                .lt(currentMessageId != null, AiChatMessage::getId, currentMessageId)
                 .orderByDesc(AiChatMessage::getCreateTime)
+                .orderByDesc(AiChatMessage::getId)
                 .last("LIMIT " + (MAX_HISTORY_ROUNDS * 2)); // N轮 = N*2条
         List<AiChatMessage> history = messageMapper.selectList(wrapper);
         // 反转回正序

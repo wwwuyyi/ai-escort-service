@@ -428,6 +428,9 @@ public class AiServiceImpl implements AiService {
 
     @Override @Transactional(rollbackFor = Exception.class)
     public void reviewContent(Long uid, Long cid, ContentReviewDTO dto) {
+        if (!"APPROVED".equals(dto.getReviewStatus()) && !"REJECTED".equals(dto.getReviewStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "复核状态仅支持APPROVED或REJECTED");
+        }
         AiGeneratedContent c = contentMapper.selectById(cid);
         if (c == null) throw new BizException(ResultCode.NOT_FOUND);
         c.setReviewStatus(dto.getReviewStatus()); c.setReviewRemark(dto.getReviewRemark());

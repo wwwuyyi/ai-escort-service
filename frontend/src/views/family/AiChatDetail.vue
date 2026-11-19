@@ -186,6 +186,7 @@ import { ElMessage } from 'element-plus'
 import { getMessages, sendMessageStream } from '@/api/aiChat'
 import api from '@/api/request'
 import FamilyTopNav from '@/components/FamilyTopNav.vue'
+import { sanitizeHtml } from '@/utils/sanitize'
 
 const route = useRoute()
 const router = useRouter()
@@ -236,15 +237,16 @@ const formatTime = (time) => {
   return h + ':' + m
 }
 
-// 格式化内容（换行转<br>）
+// 格式化内容（换行转<br>），并统一经过 DOMPurify 消毒
 const formatContent = (content) => {
   if (!content) return ''
-  return content
+  const formatted = content
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+  return sanitizeHtml(formatted)
 }
 
 // 滚动到底部
@@ -298,7 +300,7 @@ const loadHistory = async (sid) => {
 const loadContextOptions = async (type) => {
   try {
     if (type === 'ELDERLY') {
-      const res = await api.get('/elderly/page', { params: { current: 1, size: 50 } })
+      const res = await api.get('/elderly/page', { params: { current: 1, size: 1000 } })
       if (res.code === 200 && res.data?.records) {
         contextOptions.value = res.data.records.map(e => ({ id: e.id, name: e.name + (e.gender === 'MALE' ? ' 男' : ' 女') }))
       }

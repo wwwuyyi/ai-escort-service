@@ -61,4 +61,8 @@ public class OrderCreateDTO {
     @DecimalMin(value = "0.01", message = "服务金额必须大于0")
     @Schema(description = "确认金额（须与试算结果一致）")
     private BigDecimal amount;
+
+    @Size(max = 500, message = "备注长度不能超过500个字符")
+    @Schema(description = "订单备注（如轮椅、家属陪同等）")
+    private String remark;
 }

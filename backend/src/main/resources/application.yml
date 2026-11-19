@@ -46,6 +46,17 @@ jwt:
 file:
   sign-ttl-seconds: 300
 
+# 登录失败限流（单机内存；IP+账号）
+security:
+  login:
+    max-failures: 5
+    window-minutes: 5
+    lock-minutes: 15
+    cleanup-interval-ms: 60000
+    # 受信反向代理列表（逗号分隔）。默认空=不信任 X-Forwarded-For。
+    # 部署在 Nginx 等代理后时，把代理出口 IP 配到这里，例如 127.0.0.1,10.0.0.5
+    trusted-proxies: ${LOGIN_TRUSTED_PROXIES:}
+
 # 接口文档默认关闭（生产/演示）；本地需要时设置 API_DOCS_ENABLED=true
 app:
   api-docs:

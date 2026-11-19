@@ -342,6 +342,12 @@ public class OrderServiceImpl implements OrderService {
         EscortOrder o = orderMapper.selectById(orderId);
         if (o == null || !familyId.equals(o.getFamilyId()))
             throw new BizException(ResultCode.FORBIDDEN, "订单不属于您");
+        // BUG-040：先判断是否已评价，再走状态机，避免误导性的“状态不允许流转”提示
+        Long evaluated = evaluationMapper.selectCount(
+                new LambdaQueryWrapper<Evaluation>().eq(Evaluation::getOrderId, orderId));
+        if (evaluated != null && evaluated > 0) {
+            throw new BizException(ResultCode.CONFLICT, "该订单已评价");
+        }
         String cur = o.getStatus();
         try { OrderStatus.validateTransition(OrderStatus.valueOf(cur), OrderStatus.COMPLETED); }
         catch (IllegalStateException e) { throw new BizException(ResultCode.CONFLICT, e.getMessage()); }
@@ -408,7 +414,8 @@ public class OrderServiceImpl implements OrderService {
         o.setElderlyId(dto.getElderlyId()); o.setHospitalId(dto.getHospitalId());
         o.setDepartment(dto.getDepartment()); o.setServiceType(dto.getServiceType());
         o.setAppointmentTime(dto.getAppointmentTime()); o.setDuration(dto.getDuration());
-        o.setAmount(dto.getAmount()); o.setStatus("PENDING_DISPATCH"); o.setVersion(0);
+        o.setAmount(dto.getAmount()); o.setRemark(dto.getRemark());
+        o.setStatus("PENDING_DISPATCH"); o.setVersion(0);
         o.setPayStatus("PAID"); o.setPayTime(LocalDateTime.now());
         return o;
     }
@@ -455,7 +462,8 @@ public class OrderServiceImpl implements OrderService {
         vo.setAppointmentTime(o.getAppointmentTime()); vo.setDuration(o.getDuration());
         vo.setAmount(o.getAmount()); vo.setStatus(o.getStatus());
         vo.setPayStatus(o.getPayStatus()); vo.setRefundAmount(o.getRefundAmount());
-        vo.setCancelReason(o.getCancelReason()); vo.setCreateTime(o.getCreateTime());
+        vo.setCancelReason(o.getCancelReason()); vo.setRemark(o.getRemark());
+        vo.setCreateTime(o.getCreateTime());
         if (o.getElderlyId() != null) {
             ElderlyProfile e = elderlyMapper.selectById(o.getElderlyId());
             if (e != null) vo.setElderlyName(e.getName());

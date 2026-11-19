@@ -70,7 +70,9 @@ const size = ref(20)
 const total = ref(0)
 
 const load = async () => {
-  const r = await api.get('/notification/page', { current: current.value, size: size.value }).catch(() => {})
+  const r = await api.get('/notification/page', {
+    params: { current: current.value, size: size.value }
+  }).catch(() => {})
   if (r) {
     list.value = r.data.records
     total.value = r.data.total

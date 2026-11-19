@@ -11,10 +11,12 @@ import com.example.escort.module.auth.dto.RegisterDTO;
 import com.example.escort.module.auth.entity.SysUser;
 import com.example.escort.module.auth.mapper.SysUserMapper;
 import com.example.escort.module.auth.service.AuthService;
+import com.example.escort.module.auth.service.LoginRateLimiter;
 import com.example.escort.module.auth.vo.CaptchaVO;
 import com.example.escort.module.auth.vo.LoginVO;
 import com.example.escort.module.user.vo.UserInfoVO;
 import com.example.escort.security.JwtUtil;
+import com.example.escort.security.LoginClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,8 @@ public class AuthServiceImpl implements AuthService {
     private final SysUserMapper sysUserMapper;
     private final JwtUtil jwtUtil;
     private final HttpServletRequest request;
+    private final LoginRateLimiter loginRateLimiter;
+    private final LoginClientIpResolver loginClientIpResolver;
 
     private static final String CAPTCHA_SESSION_PREFIX = "CAPTCHA_";
 
@@ -84,21 +88,33 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginVO login(LoginDTO dto) {
-        // 校验验证码
+        // 校验验证码（验证码失败不计入账号失败次数）
         validateCaptcha(dto.getCaptchaKey(), dto.getCaptcha());
+
+        String clientIp = loginClientIpResolver.resolve(request);
+        String username = dto.getUsername();
+        // 锁定期内，即使密码正确也返回 429，并给出剩余时间
+        long lockedMillis = loginRateLimiter.checkLocked(clientIp, username);
+        if (lockedMillis > 0) {
+            long minutes = Math.max(1, (lockedMillis + 59_999) / 60_000);
+            throw new BizException(ResultCode.TOO_MANY_REQUESTS,
+                    "登录失败次数过多，请 " + minutes + " 分钟后再试");
+        }
 
         // 查用户
         SysUser user = sysUserMapper.selectOne(
-                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, dto.getUsername()));
+                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
         if (user == null) {
+            loginRateLimiter.recordFailure(clientIp, username);
             throw new BizException(ResultCode.BAD_REQUEST, "账号或密码错误");
         }
         if ("DISABLED".equals(user.getStatus())) {
             throw new BizException(ResultCode.FORBIDDEN, "账号已被禁用，请联系管理员");
         }
 
-        // 校验密码（BCrypt）
+        // 校验密码（BCrypt）；失败计入限流
         if (!BCrypt.checkpw(dto.getPassword(), user.getPassword())) {
+            loginRateLimiter.recordFailure(clientIp, username);
             throw new BizException(ResultCode.BAD_REQUEST, "账号或密码错误");
         }
 
@@ -109,6 +125,9 @@ public class AuthServiceImpl implements AuthService {
             throw new BizException(ResultCode.BAD_REQUEST,
                     "该账号不是" + roleLabel + "账号，请切换到对应端口登录");
         }
+
+        // 成功登录清零该 IP+账号的失败计数
+        loginRateLimiter.reset(clientIp, username);
 
         // 签发JWT（携带当前令牌版本号，登出/改密/禁用后旧令牌失效）
         int tokenVersion = user.getTokenVersion() == null ? 0 : user.getTokenVersion();

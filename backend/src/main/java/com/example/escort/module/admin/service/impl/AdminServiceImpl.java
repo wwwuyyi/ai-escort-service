@@ -27,6 +27,8 @@ import com.example.escort.module.order.vo.OrderVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -175,7 +177,8 @@ public class AdminServiceImpl implements AdminService {
         vo.setAppointmentTime(o.getAppointmentTime()); vo.setDuration(o.getDuration());
         vo.setAmount(o.getAmount()); vo.setStatus(o.getStatus());
         vo.setPayStatus(o.getPayStatus()); vo.setRefundAmount(o.getRefundAmount());
-        vo.setCancelReason(o.getCancelReason()); vo.setCreateTime(o.getCreateTime());
+        vo.setCancelReason(o.getCancelReason()); vo.setRemark(o.getRemark());
+        vo.setCreateTime(o.getCreateTime());
         if (o.getFamilyId() != null) {
             SysUser f = userMapper.selectById(o.getFamilyId());
             if (f != null) vo.setFamilyName(f.getNickname());
@@ -205,7 +208,38 @@ public class AdminServiceImpl implements AdminService {
 
     @Override @Transactional(rollbackFor = Exception.class)
     public void hideEvaluation(Long evalId, String reason) {
+        Evaluation ev = evalMapper.selectById(evalId);
+        if (ev == null) throw new BizException(ResultCode.NOT_FOUND, "评价不存在");
         evalMapper.update(null, new LambdaUpdateWrapper<Evaluation>()
                 .eq(Evaluation::getId, evalId).set(Evaluation::getIsHidden, 1).set(Evaluation::getHideReason, reason));
+        recalcEscortRating(ev.getEscortId());
+    }
+
+    @Override @Transactional(rollbackFor = Exception.class)
+    public void unhideEvaluation(Long evalId) {
+        Evaluation ev = evalMapper.selectById(evalId);
+        if (ev == null) throw new BizException(ResultCode.NOT_FOUND, "评价不存在");
+        evalMapper.update(null, new LambdaUpdateWrapper<Evaluation>()
+                .eq(Evaluation::getId, evalId)
+                .set(Evaluation::getIsHidden, 0)
+                .set(Evaluation::getHideReason, null));
+        recalcEscortRating(ev.getEscortId());
+    }
+
+    /** 按当前可见评价重算平均分；无可见评价时恢复默认 5.00 */
+    private void recalcEscortRating(Long escortId) {
+        if (escortId == null) return;
+        List<Evaluation> visible = evalMapper.selectList(new LambdaQueryWrapper<Evaluation>()
+                .eq(Evaluation::getEscortId, escortId)
+                .eq(Evaluation::getIsHidden, 0));
+        BigDecimal avg = new BigDecimal("5.00");
+        if (!visible.isEmpty()) {
+            avg = visible.stream().map(e -> BigDecimal.valueOf(e.getScore()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .divide(BigDecimal.valueOf(visible.size()), 2, RoundingMode.HALF_UP);
+        }
+        escortMapper.update(null, new LambdaUpdateWrapper<EscortProfile>()
+                .eq(EscortProfile::getUserId, escortId)
+                .set(EscortProfile::getAvgRating, avg));
     }
 }

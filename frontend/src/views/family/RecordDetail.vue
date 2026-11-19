@@ -92,20 +92,21 @@
           <el-icon :size="20" color="var(--amber)"><WarningFilled /></el-icon>
           <span>AI生成内容仅供参考，不构成任何诊疗建议</span>
         </div>
-        <div class="explain-text" v-html="explanationContent"></div>
+        <div class="explain-text" v-html="safeExplanation"></div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ChatDotRound, Picture, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import api from '@/api/request'
 import { signedFileUrl } from '@/utils/fileUrl'
 import { docTypeLabel } from '@/utils/docType'
+import { sanitizeHtml } from '@/utils/sanitize'
 
 const route = useRoute()
 const router = useRouter()
@@ -113,6 +114,7 @@ const record = ref(null)
 const documents = ref([])
 const generating = ref(false)
 const explanationContent = ref('')
+const safeExplanation = computed(() => sanitizeHtml(explanationContent.value))
 
 const loadRecord = async () => {
   try {

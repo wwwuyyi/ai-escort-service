@@ -196,7 +196,7 @@ async function openCreate() {
   createVisible.value = true
   try {
     const [elderlyRes, hospitalRes] = await Promise.all([
-      api.get('/elderly/page', { params: { current: 1, size: 100 } }),
+      api.get('/elderly/page', { params: { current: 1, size: 1000 } }),
       api.get('/hospital/list')
     ])
     elderlyList.value = elderlyRes.data?.records || []

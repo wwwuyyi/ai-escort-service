@@ -1,0 +1,20 @@
+# ================================================================
+# 生产环境配置（SPRING_PROFILES_ACTIVE=prod）
+# 所有敏感项必须通过环境变量注入；缺失或仍为默认值会拒绝启动。
+#   JWT_SECRET    : JWT 签名密钥（≥32字节，JwtUtil 校验）
+#   AES_KEY       : 敏感字段 AES 密钥（≥16字节，ProdConfigGuard 校验）
+#   DB_PASSWORD   : 数据库口令（非空且不能为 root，ProdConfigGuard 校验）
+#   DB_USERNAME   : 数据库账号（默认 root，建议使用最小权限账号）
+# ================================================================
+spring:
+  datasource:
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:escort_db}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+
+encrypt:
+  aes-key: ${AES_KEY}
+
+app:
+  api-docs:
+    enabled: false

@@ -1,6 +1,7 @@
 @echo off
 chcp 936 >nul
 setlocal EnableDelayedExpansion
+if not defined SPRING_PROFILES_ACTIVE set SPRING_PROFILES_ACTIVE=demo
 
 REM ---------- JWT 密钥 ----------
 REM 安全要求：后端在未配置 JWT_SECRET 时拒绝启动。

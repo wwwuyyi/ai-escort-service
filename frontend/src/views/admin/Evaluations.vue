@@ -35,7 +35,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
             <el-button
               v-if="!row.isHidden"
@@ -45,6 +45,15 @@
               @click="handleHide(row)"
             >
               隐藏
+            </el-button>
+            <el-button
+              v-else
+              type="success"
+              plain
+              size="small"
+              @click="handleUnhide(row)"
+            >
+              恢复
             </el-button>
           </template>
         </el-table-column>
@@ -94,7 +103,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Star } from '@element-plus/icons-vue'
 import api from '@/api/request'
 import { formatDateTime } from '@/utils/datetime'
@@ -130,6 +139,25 @@ function handleHide(row) {
   hideTarget.value = row
   hideReason.value = ''
   hideVisible.value = true
+}
+
+async function handleUnhide(row) {
+  try {
+    await ElMessageBox.confirm(
+      `确认恢复订单 "${row.orderNo}" 的评价吗？评分将重新计入陪诊师平均分。`,
+      '恢复评价',
+      { confirmButtonText: '确认恢复', cancelButtonText: '取消', type: 'info' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await api.put(`/admin/evaluation/${row.id}/unhide`)
+    ElMessage.success('评价已恢复')
+    await fetchData()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '恢复失败')
+  }
 }
 
 async function submitHide() {

@@ -28,6 +28,9 @@ public enum ResultCode {
     /** 业务状态冲突（含订单非法流转、乐观锁冲突） */
     CONFLICT(409, "业务状态冲突"),
 
+    /** 上传文件超过大小限制 */
+    PAYLOAD_TOO_LARGE(413, "文件过大"),
+
     /** 触发重试上限或限流 */
     TOO_MANY_REQUESTS(429, "请求过于频繁"),
 

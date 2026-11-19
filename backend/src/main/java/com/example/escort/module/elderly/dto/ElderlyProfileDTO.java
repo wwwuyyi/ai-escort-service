@@ -34,6 +34,7 @@ public class ElderlyProfileDTO {
     @Schema(description = "身份证号（系统加密存储）", example = "330102195005201234")
     private String idCard;
 
+    @Pattern(regexp = "^$|^1[3-9]\\d{9}$", message = "手机号格式不正确")
     @Schema(description = "联系电话", example = "13800138001")
     private String phone;
 

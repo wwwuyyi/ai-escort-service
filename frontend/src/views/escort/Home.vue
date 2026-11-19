@@ -207,6 +207,15 @@
             </button>
           </div>
         </section>
+        <section v-else class="notifications rv-rise" style="--i: 5">
+          <div class="section-head">
+            <div>
+              <h2>消息通知</h2>
+              <p>订单、公告与服务提醒</p>
+            </div>
+          </div>
+          <el-empty description="暂无新通知" :image-size="60" />
+        </section>
       </template>
     </main>
 
@@ -311,25 +320,15 @@ onMounted(async () => {
     orders.value = orderRes.data?.records || []
 
     const notifyRecords = notiRes?.data?.records || []
-    if (notifyRecords.length > 0) {
-      notifications.value = notifyRecords.map(n => ({
-        id: n.id,
-        title: n.title || '消息通知',
-        content: n.content || '',
-        time: n.createTime,
-        bizType: n.bizType,
-        orderId: n.bizType === 'ORDER' ? n.bizId : null
-      }))
-    } else {
-      notifications.value = orders.value.slice(0, 5).map(o => ({
-        id: `order-${o.id}`,
-        title: '订单通知',
-        content: `${o.orderNo} · ${o.elderlyName || '就诊人'} · ${o.appointmentTime || ''}`,
-        time: o.createTime,
-        bizType: 'ORDER',
-        orderId: o.id
-      }))
-    }
+    // BUG-041：不再用订单包装“伪通知”，无真实通知时展示空状态
+    notifications.value = notifyRecords.map(n => ({
+      id: n.id,
+      title: n.title || '消息通知',
+      content: n.content || '',
+      time: n.createTime,
+      bizType: n.bizType,
+      orderId: n.bizType === 'ORDER' ? n.bizId : null
+    }))
   } catch (e) {
     notifications.value = []
   }

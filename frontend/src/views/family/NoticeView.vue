@@ -18,7 +18,7 @@
       </div>
 
       <div class="content-card">
-        <div class="content-body" v-html="content"></div>
+        <div class="content-body" v-html="safeContent"></div>
       </div>
     </div>
 
@@ -38,14 +38,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowLeft, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import api from '@/api/request'
+import { sanitizeHtml } from '@/utils/sanitize'
 
 const route = useRoute()
 const content = ref('')
+const safeContent = computed(() => sanitizeHtml(content.value))
 const loading = ref(true)
 
 const loadContent = async () => {

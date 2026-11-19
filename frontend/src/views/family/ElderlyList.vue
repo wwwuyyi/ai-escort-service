@@ -73,6 +73,19 @@
         </el-button>
       </div>
 
+      <div v-if="total > size" class="records-footer">
+        <span class="text-note">共 {{ total }} 位老人</span>
+        <el-pagination
+          v-model:current-page="current"
+          :page-size="size"
+          :total="total"
+          background
+          layout="prev, pager, next"
+          :pager-count="5"
+          @current-change="fetchList"
+        />
+      </div>
+
       <section
         v-if="elderlyList.length > 0"
         class="tips-strip surface-card rv-rise"
@@ -100,6 +113,9 @@ import api from '@/api/request'
 import FamilyTopNav from '@/components/FamilyTopNav.vue'
 
 const elderlyList = ref([])
+const current = ref(1)
+const size = ref(10)
+const total = ref(0)
 
 const computedAge = (birthDate) => {
   if (!birthDate) return '-'
@@ -123,9 +139,12 @@ const genderLabel = (gender) => {
 
 const fetchList = async () => {
   try {
-    const res = await api.get('/elderly/page')
+    const res = await api.get('/elderly/page', {
+      params: { current: current.value, size: size.value }
+    })
     if (res.code === 200 && res.data) {
       elderlyList.value = res.data.records || []
+      total.value = res.data.total || 0
     }
   } catch (e) {
     ElMessage.error('加载老人档案失败')
@@ -142,6 +161,7 @@ const handleDelete = async (elderly) => {
     const res = await api.delete(`/elderly/${elderly.id}`)
     if (res.code === 200) {
       ElMessage.success('删除成功')
+      if (elderlyList.value.length === 1 && current.value > 1) current.value--
       fetchList()
     }
   } catch (e) {
@@ -159,6 +179,14 @@ onMounted(fetchList)
 </script>
 
 <style scoped>
+.records-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0;
+}
+
 .elderly-list-page {
   min-height: 100vh;
   background: var(--bg);

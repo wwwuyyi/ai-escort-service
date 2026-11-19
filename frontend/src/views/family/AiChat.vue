@@ -209,7 +209,7 @@ const loadSessions = async () => {
 
 const loadElderly = async () => {
   try {
-    const res = await api.get('/elderly/page')
+    const res = await api.get('/elderly/page', { params: { current: 1, size: 1000 } })
     if (res.code === 200 && res.data) {
       elderlyList.value = res.data.records || []
     }

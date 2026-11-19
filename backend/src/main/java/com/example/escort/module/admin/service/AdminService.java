@@ -19,4 +19,6 @@ public interface AdminService {
     IPage<OrderVO> orderPage(int current, int size, String status, String keyword);
     IPage<Evaluation> evaluationPage(int current, int size);
     void hideEvaluation(Long evalId, String reason);
+    /** 取消隐藏并重算陪诊师平均分 */
+    void unhideEvaluation(Long evalId);
 }

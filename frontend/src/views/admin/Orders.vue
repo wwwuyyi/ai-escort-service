@@ -15,11 +15,12 @@
         @change="handleSearch"
       >
         <el-option label="全部" value="" />
-        <el-option label="待派单" value="PENDING_DISPATCH" />
-        <el-option label="已接单" value="ACCEPTED" />
-        <el-option label="服务中" value="IN_SERVICE" />
-        <el-option label="已完成" value="SERVICE_FINISHED" />
-        <el-option label="已取消" value="CANCELLED" />
+        <el-option
+          v-for="opt in ORDER_STATUS_OPTIONS"
+          :key="opt.value"
+          :label="opt.label"
+          :value="opt.value"
+        />
       </el-select>
       <el-input
         v-model="keyword"
@@ -143,7 +144,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Document } from '@element-plus/icons-vue'
 import api from '@/api/request'
-import { getOrderStatusLabel, getOrderStatusType, getOrderStatusClass } from '@/utils/orderStatus'
+import { getOrderStatusLabel, getOrderStatusType, getOrderStatusClass, ORDER_STATUS_OPTIONS } from '@/utils/orderStatus'
 
 const loading = ref(false)
 const dispatching = ref(false)

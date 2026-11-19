@@ -1,0 +1,7 @@
+# ================================================================
+# 本机演示环境（start.bat 默认 SPRING_PROFILES_ACTIVE=demo）
+# 保留 application.yml 中的本地默认 AES/DB 配置，仅用于演示与答辩；
+# 生产部署请使用 prod profile 并注入 AES_KEY/DB_PASSWORD/JWT_SECRET。
+# ================================================================
+app:
+  demo: true
