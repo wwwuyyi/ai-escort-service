@@ -32,8 +32,8 @@ public class SensitiveConfigWarnLogger {
         if (aesKey.contains("demo")) {
             log.warn("【安全警告】AES 密钥使用默认值，生产环境请设置环境变量 AES_KEY");
         }
-        if ("root".equals(dbPassword)) {
-            log.warn("【安全警告】数据库密码使用默认值 root，生产环境请设置环境变量 DB_PASSWORD");
+        if ("root".equals(dbPassword) || "123456".equals(dbPassword)) {
+            log.warn("【安全警告】数据库密码使用默认值，生产环境请设置环境变量 DB_PASSWORD");
         }
     }
 }

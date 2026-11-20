@@ -25,7 +25,8 @@ public class ProdConfigGuard {
 
     @PostConstruct
     public void validate() {
-        if (dbPassword == null || dbPassword.isBlank() || "root".equals(dbPassword)) {
+        if (dbPassword == null || dbPassword.isBlank()
+                || "root".equals(dbPassword) || "123456".equals(dbPassword)) {
             throw new IllegalStateException(
                     "生产环境必须通过 DB_PASSWORD 注入非默认数据库口令，拒绝启动");
         }

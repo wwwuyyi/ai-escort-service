@@ -36,7 +36,7 @@
 | JDK | 17+ | `java -version` 验证 |
 | Maven | 3.8+ | `mvn -v` 验证 |
 | Node.js | 18+ | 前端与 Mock Server 需要 |
-| MySQL | 8.0 | 端口 3306，默认账号 root/root |
+| MySQL | 8.0 | 端口 3306，默认账号 root/123456 |
 
 ## 四、快速启动
 
@@ -45,13 +45,13 @@
 在 `01-源代码` 目录打开 cmd，依次执行：
 
 ```bat
-mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS escort_db DEFAULT CHARACTER SET utf8mb4;"
-mysql -uroot -proot escort_db < sql/01-schema.sql
-mysql -uroot -proot escort_db < sql/02-init-data.sql
-mysql -uroot -proot escort_db < sql/04-add-chat-tables.sql
-mysql -uroot -proot escort_db < sql/05-fix-gender-width.sql
-mysql -uroot -proot escort_db < sql/06-security-token-version-and-request-id-scope.sql
-mysql -uroot -proot escort_db < sql/07-add-order-remark.sql
+mysql -uroot -p123456 -e "CREATE DATABASE IF NOT EXISTS escort_db DEFAULT CHARACTER SET utf8mb4;"
+mysql -uroot -p123456 escort_db < sql/01-schema.sql
+mysql -uroot -p123456 escort_db < sql/02-init-data.sql
+mysql -uroot -p123456 escort_db < sql/04-add-chat-tables.sql
+mysql -uroot -p123456 escort_db < sql/05-fix-gender-width.sql
+mysql -uroot -p123456 escort_db < sql/06-security-token-version-and-request-id-scope.sql
+mysql -uroot -p123456 escort_db < sql/07-add-order-remark.sql
 ```
 
 > **全新库执行顺序：01→02→04→05→06→07。** `01-schema.sql` 已包含 `request_id`，因此全新库不要再执行 `03-alter-order-request-id.sql`（它是早期旧库升级脚本，会提示重复列）。旧库升级如缺 `request_id` 才执行 03，再补跑 05→06→07。06 增加 `token_version` 与订单 `(family_id, request_id)` 唯一键，07 确保 `escort_order.remark` 存在；06/07 均可重复执行。
@@ -67,9 +67,9 @@ set JWT_SECRET=请替换为至少32字节的随机字符串
 `start.bat` 在未设置时会自动生成本次运行专用的随机密钥（重启后旧 Token 失效），仅适合本机演示。
 生产环境必须通过环境变量或密钥管理系统注入，不能使用仓库内或启动脚本生成的临时值。
 
-### 3. 配置数据库（演示默认 root/root）
+### 3. 配置数据库（演示默认 root/123456）
 
-demo 环境默认读取 `root/root`；生产环境使用 prod profile 并注入非默认口令：
+demo 环境默认读取 `root/123456`；生产环境使用 prod profile 并注入非默认口令：
 
 ```bat
 set SPRING_PROFILES_ACTIVE=prod
@@ -143,7 +143,7 @@ set DB_PASSWORD=非默认数据库口令
 java -jar target/escort-1.0.0-SNAPSHOT.jar
 ```
 
-- prod 会拒绝启动：未注入 `JWT_SECRET`、`AES_KEY`、`DB_PASSWORD`，或 `DB_PASSWORD=root`、`AES_KEY=escort-aes-key-2026-demo`、JWT 仍为默认/过短。
+- prod 会拒绝启动：未注入 `JWT_SECRET`、`AES_KEY`、`DB_PASSWORD`，或 `DB_PASSWORD` 为 `root`/`123456` 等演示默认值、`AES_KEY=escort-aes-key-2026-demo`、JWT 仍为默认/过短。
 - **AES_KEY 必须与库中已有密文匹配**；更换密钥前需先重加密 `elderly_profile.id_card/address`、`escort_profile.id_card` 等敏感字段。
 - 接口文档默认关闭（`/doc.html`、`/v3/api-docs` → 404）；本地调试可设置 `API_DOCS_ENABLED=true`。
 - 登录限流默认：同一 IP+账号 5 分钟内连续失败 5 次锁定 15 分钟；可通过 `security.login.max-failures/window-minutes/lock-minutes` 调整。部署在反向代理后时，必须把代理出口 IP 配置到 `security.login.trusted-proxies`（环境变量 `LOGIN_TRUSTED_PROXIES`），否则不会信任 `X-Forwarded-For`。
