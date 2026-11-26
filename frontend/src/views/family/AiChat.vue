@@ -129,7 +129,7 @@
             </div>
 
             <p class="panel-note">
-              AI 会结合老人档案与就医记录进行回答，内容仅供参考，不构成医疗建议。
+              AI 会结合老人档案与就医记录进行回答，内容仅供参考，不构成任何诊疗建议。
             </p>
           </section>
 
@@ -146,7 +146,7 @@
 
       <div class="chat-disclaimer">
         <el-icon :size="15"><WarningFilled /></el-icon>
-        <span>AI 生成内容仅供参考，不构成任何医疗建议；具体诊疗请遵医嘱。</span>
+        <span>AI生成内容仅供参考，不构成任何诊疗建议</span>
       </div>
     </main>
   </div>

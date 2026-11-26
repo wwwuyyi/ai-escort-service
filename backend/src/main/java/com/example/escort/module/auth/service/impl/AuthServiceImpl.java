@@ -21,8 +21,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -42,6 +44,14 @@ public class AuthServiceImpl implements AuthService {
     private final LoginClientIpResolver loginClientIpResolver;
 
     private static final String CAPTCHA_SESSION_PREFIX = "CAPTCHA_";
+
+    /**
+     * 仅用于自动化测试的验证码旁路码。
+     * 由环境变量 CAPTCHA_FIXED_CODE 注入；未设置时为空串，旁路完全不存在，
+     * 校验行为与未加该功能时一致。严禁写入 start.bat 或生产配置。
+     */
+    @Value("${CAPTCHA_FIXED_CODE:}")
+    private String captchaFixedCode;
 
     @Override
     public CaptchaVO generateCaptcha() {
@@ -184,6 +194,11 @@ public class AuthServiceImpl implements AuthService {
      * 校验验证码（从HttpSession取值比对后立即删除，防止重复使用）
      */
     private void validateCaptcha(String captchaKey, String captchaInput) {
+        // 自动化测试旁路：仅当 CAPTCHA_FIXED_CODE 被显式设置时生效，未设置则完全跳过本分支
+        if (StringUtils.hasText(captchaFixedCode) && captchaFixedCode.equalsIgnoreCase(captchaInput)) {
+            log.warn("验证码旁路生效（CAPTCHA_FIXED_CODE 已设置），仅限自动化测试环境");
+            return;
+        }
         HttpSession session = request.getSession(false);
         if (session == null) throw new BizException(ResultCode.BAD_REQUEST, "验证码已过期，请重新获取");
         String storedCode = (String) session.getAttribute(CAPTCHA_SESSION_PREFIX + captchaKey);

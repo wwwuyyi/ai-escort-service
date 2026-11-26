@@ -665,3 +665,146 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ===== 适老化显示模式（仅 body.a11y-large；默认不生效；仅 /family 路由加类） ===== */
+body.a11y-large :where(p, span, em, strong, div, td, th, label, a, li, h4, h5, h6, button, input, textarea, select, code):not(.el-icon):not(.el-icon *):not(.el-tag):not(.el-tag *):not(.el-badge__content):not(.el-badge__content *):not(.el-button):not(.el-button *):not(.el-step__icon):not(.el-step__icon *) {
+  font-size: 18px !important;
+  color: #333 !important;
+}
+body.a11y-large h1,
+body.a11y-large h2,
+body.a11y-large h3,
+body.a11y-large .page-heading,
+body.a11y-large .page-title,
+body.a11y-large .text-h2,
+body.a11y-large .chat-title,
+body.a11y-large .confirm-title,
+body.a11y-large .hero-title {
+  font-size: 22px !important;
+  color: #333 !important;
+}
+body.a11y-large .page-heading,
+body.a11y-large .hero-title {
+  font-size: 30px !important;
+}
+body.a11y-large .el-button:not(.is-text):not(.is-link) {
+  height: 48px !important;
+  min-height: 48px !important;
+  font-size: 20px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+body.a11y-large .el-button:not(.is-text):not(.is-link) span {
+  font-size: 20px !important;
+}
+body.a11y-large .el-input__wrapper,
+body.a11y-large .el-select__wrapper {
+  min-height: 44px !important;
+  font-size: 18px !important;
+}
+body.a11y-large .el-input__inner {
+  height: 44px !important;
+  font-size: 18px !important;
+}
+body.a11y-large .el-textarea__inner {
+  min-height: 44px !important;
+  font-size: 18px !important;
+}
+body.a11y-large .mobile-back {
+  display: inline-flex !important;
+}
+body.a11y-large .el-table .cell {
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+}
+body.a11y-large .page-wrap,
+body.a11y-large .order-create-page,
+body.a11y-large .page-body,
+body.a11y-large .chat-main {
+  overflow-wrap: anywhere !important;
+}
+body.a11y-large dt,
+body.a11y-large dd {
+  font-size: 18px !important;
+  color: #333 !important;
+}
+body.a11y-large .el-button.is-text,
+body.a11y-large .el-button.is-link {
+  font-size: 18px !important;
+}
+body.a11y-large .el-button.is-text span,
+body.a11y-large .el-button.is-link span {
+  font-size: 18px !important;
+}
+body.a11y-large .hero-banner {
+  aspect-ratio: auto !important;
+  max-height: none !important;
+  min-height: 0 !important;
+}
+body.a11y-large .session-main strong,
+body.a11y-large .session-main em {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+body.a11y-large .record-meta dd {
+  max-width: 72% !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+}
+body.a11y-large .session-row {
+  min-height: 88px !important;
+  height: auto !important;
+  align-items: flex-start !important;
+}
+body.a11y-large .session-row .session-icon,
+body.a11y-large .session-row .session-time,
+body.a11y-large .session-row .delete-btn {
+  margin-top: 2px !important;
+}
+body.a11y-large .hero-banner {
+  min-height: calc(100vh - 200px) !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  align-items: center !important;
+  padding: 48px clamp(32px, 4vw, 64px) !important;
+}
+body.a11y-large .hero-copy {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+}
+body.a11y-large .hero-art {
+  justify-content: center !important;
+  gap: 32px !important;
+}
+body.a11y-large .quick-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 24px !important;
+}
+body.a11y-large .quick-card {
+  grid-column: auto / span 1 !important;
+  min-height: 112px !important;
+  padding: 24px !important;
+}
+body.a11y-large .hero-banner {
+  align-items: stretch !important;
+}
+body.a11y-large .hero-copy {
+  align-self: stretch !important;
+  justify-content: space-between !important;
+  padding: 48px 0 !important;
+}
+body.a11y-large .hero-art {
+  align-self: stretch !important;
+  justify-content: space-between !important;
+  padding: 72px 0 !important;
+}
+body.a11y-large .hero-art .ecg-line {
+  width: 100% !important;
+  height: 200px !important;
+}

@@ -337,7 +337,7 @@ public class AiServiceImpl implements AiService {
     }
 
     /**
-     * 主模型不可用时的本地Mock兜底（mock-ai-server 的 /chat 返回中文HTML模板）。
+     * 主模型不可用时的本地Mock兜底（ai-service 的 /llm/chat 返回中文HTML模板）。
      * @return 兜底内容；未启用或调用失败返回 null
      */
     private ContentVO fallbackGen(String type, Long bizId, String prompt) {

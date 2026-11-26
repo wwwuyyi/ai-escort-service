@@ -14,6 +14,23 @@
     </div>
 
     <template v-else>
+      <div
+        v-if="profile.role === 'FAMILY'"
+        style="width:min(1120px,100%);margin:16px auto 0;padding:0 24px;"
+      >
+        <el-card shadow="never" style="border-radius:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+            <div>
+              <div style="font-size:18px;font-weight:700;">适老化显示模式</div>
+              <div style="font-size:14px;color:var(--muted);margin-top:4px;">
+                放大字号、按钮与输入框；默认关闭，仅影响本机当前浏览器。
+              </div>
+            </div>
+            <el-switch v-model="a11yLarge" @change="setA11yMode" />
+          </div>
+        </el-card>
+      </div>
+
       <div class="profile-grid">
       <!-- 基本信息卡片 -->
       <el-card class="info-card rv-rise" style="--i: 0">
@@ -73,6 +90,17 @@ const saving = ref(false)
 const changing = ref(false)
 const pwdRef = ref(null)
 const profile = ref({})
+const a11yLarge = ref(localStorage.getItem('a11y_large') === '1')
+
+function setA11yMode(val) {
+  if (val) {
+    document.body.classList.add('a11y-large')
+    localStorage.setItem('a11y_large', '1')
+  } else {
+    document.body.classList.remove('a11y-large')
+    localStorage.setItem('a11y_large', '0')
+  }
+}
 
 const form = reactive({ nickname: '', phone: '' })
 const pwd = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })

@@ -72,7 +72,7 @@ ai:
     base-url: ${AI_LLM_BASE_URL:https://api.deepseek.com/v1}
     api-key: ${AI_API_KEY:demo-api-key}
     read-timeout-ms: 30000          # LLM生成耗时较长，30秒超时
-    # 主模型不可用/熔断时自动切换本地Mock兜底（需先启动 mock-ai-server）
+    # 主模型不可用/熔断时自动切换本地Mock兜底（需先启动 ai-service）
     fallback-base-url: ${AI_LLM_FALLBACK_BASE_URL:http://localhost:9002/llm}
     fallback-api-key: ${AI_LLM_FALLBACK_API_KEY:demo-api-key}
     # AI对话模型：默认 deepseek-flash（当前账号可用）；如需思考过程可设置 AI_CHAT_MODEL=deepseek-reasoner
